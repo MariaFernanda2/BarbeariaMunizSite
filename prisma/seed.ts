@@ -7,21 +7,26 @@ async function seedDatabase() {
     const images = [
       "https://utfs.io/f/c97a2dc9-cf62-468b-a851-bfd2bdde775f-16p.png",
       "https://utfs.io/f/45331760-899c-4b4b-910e-e00babb6ed81-16q.png",
-      // ... (adicionar mais imagens conforme necessário)
     ];
 
-    // Unidades das barbearias
+    // Nomes das barbearias
     const creativeNames = [
       "Barbearia Muniz - Centro de Cotia",
       "Barbearia Muniz - Granja Vianna",
-      // ... (adicionar mais nomes conforme necessário)
+      "Barbearia Muniz - São Paulo II",
+      "Barbearia Muniz - Alphaville",
+      "Barbearia Muniz - Morumbi",
+      "Barbearia Muniz - Jardins",
     ];
 
-    // Endereços das barbearias
+    // Endereços para as barbearias
     const addresses = [
-      "Rua Guido Fecchio, 626",
-      "Avenida São Camilo, 456",
-      // ... (adicionar mais endereços conforme necessário)
+      "Rua dos coqueirais, 265",
+      "Av. São Camilo, 168",
+      "Av. José Giorgi, 698",
+      "AL. Rio Negro, 452",
+      "Rua Pompeu de Toledo, 456",
+      "Avenida Nove de Julho, 598",
     ];
 
     const services = [
@@ -54,8 +59,8 @@ async function seedDatabase() {
           "https://utfs.io/f/2118f76e-89e4-43e6-87c9-8f157500c333-b0ps0b.png",
       },
       {
-        name: "Pigmentação",
-        description: "Deixe seu visual mais marcante.",
+        name: "Massagem",
+        description: "Relaxe com uma massagem revigorante.",
         price: 50.0,
         imageUrl:
           "https://utfs.io/f/c4919193-a675-4c47-9f21-ebd86d1c8e6a-4oen2a.png",
@@ -64,48 +69,47 @@ async function seedDatabase() {
         name: "Hidratação",
         description: "Hidratação profunda para cabelo e barba.",
         price: 25.0,
-        imageUrl: "Fios hidratados, macios e brilhantes.",
-      },
-      {
-        name: "Progressiva",
-        description: "Seu cabelo como você quiser!.",
-        price: 25.0,
-        imageUrl: "Fios alisados, macios e brilhantes.",
+        imageUrl:
+          "https://utfs.io/f/8a457cda-f768-411d-a737-cdb23ca6b9b5-b3pegf.png",
       },
     ];
 
-    // Criar barbearias
-    const barbershops = [];
-    for (let i = 0; i < creativeNames.length; i++) {
-      const name = creativeNames[i];
-      const address = addresses[i];
-      const imageUrl = images[i];
+// Criar barbearias com nomes, endereços e imagens fixas
+const barbershops = []; // Adicione este array para armazenar as barbearias
+for (let i = 0; i < creativeNames.length; i++) {
+  const name = creativeNames[i];
+  const address = addresses[i];
+  const imageUrl = images[i];
 
-      const barbershop = await prisma.barbershop.create({
-        data: {
-          name,
-          address,
-          imageUrl,
-        },
-      });
+  const barbershop = await prisma.barbershop.create({
+    data: {
+      name,
+      address,
+      imageUrl: imageUrl,
+    },
+  });
 
-      for (const service of services) {
-        await prisma.service.create({
-          data: {
-            name: service.name,
-            description: service.description,
-            price: service.price,
-            barbershop: {
-              connect: {
-                id: barbershop.id,
-              },
-            },
+  for (const service of services) {
+    await prisma.service.create({
+      data: {
+        name: service.name,
+        description: service.description,
+        price: service.price,
+        barbershop: {
+          connect: {
+            id: barbershop.id,
           },
-        });
-      }
+        },
+        imageUrl: service.imageUrl,
+      },
+    });
+  }
 
-      barbershops.push(barbershop);
-    }
+  barbershops.push(barbershop); // Adicione cada barbearia ao array
+}
+
+// Agora você pode usar o array barbershops conforme necessário
+
 
     // Fechar a conexão com o banco de dados
     await prisma.$disconnect();
