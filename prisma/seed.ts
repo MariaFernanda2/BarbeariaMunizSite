@@ -4,6 +4,13 @@ const prisma = new PrismaClient();
 
 async function seedDatabase() {
   try {
+    // Deletar todos os serviços existentes
+    await prisma.booking.deleteMany({});
+    await prisma.service.deleteMany({});
+ 
+     await prisma.barbershop.deleteMany({});
+
+
     const images = [
       "https://utfs.io/f/c97a2dc9-cf62-468b-a851-bfd2bdde775f-16p.png",
       "https://utfs.io/f/45331760-899c-4b4b-910e-e00babb6ed81-16q.png",
@@ -13,20 +20,12 @@ async function seedDatabase() {
     const creativeNames = [
       "Barbearia Muniz - Centro de Cotia",
       "Barbearia Muniz - Granja Vianna",
-      "Barbearia Muniz - São Paulo II",
-      "Barbearia Muniz - Alphaville",
-      "Barbearia Muniz - Morumbi",
-      "Barbearia Muniz - Jardins",
     ];
 
     // Endereços para as barbearias
     const addresses = [
       "Rua Guido Fecchio, 626",
       "Av. São Camilo, 168",
-      "Av. José Giorgi, 698",
-      "AL. Rio Negro, 452",
-      "Rua Pompeu de Toledo, 456",
-      "Avenida Nove de Julho, 598",
     ];
 
     const services = [
@@ -43,8 +42,7 @@ async function seedDatabase() {
         price: 25.0,
         imageUrl:
           "https://utfs.io/f/e6bdffb6-24a9-455b-aba3-903c2c2b5bde-1jo6tu.png",
-      },
-      {
+      }, {
         name: "Pézinho",
         description: "Acabamento perfeito para um visual renovado.",
         price: 10.0,
@@ -108,45 +106,40 @@ async function seedDatabase() {
           "https://utfs.io/f/8a457cda-f768-411d-a737-cdb23ca6b9b5-b3pegf.png",
       },
       
-      
     ];
+    // Criar barbearias com nomes, endereços e imagens fixas
+    const barbershops = []; // Adicione este array para armazenar as barbearias
+    for (let i = 0; i < creativeNames.length; i++) {
+      const name = creativeNames[i];
+      const address = addresses[i];
+      const imageUrl = images[i];
 
-// Criar barbearias com nomes, endereços e imagens fixas
-const barbershops = []; // Adicione este array para armazenar as barbearias
-for (let i = 0; i < creativeNames.length; i++) {
-  const name = creativeNames[i];
-  const address = addresses[i];
-  const imageUrl = images[i];
-
-  const barbershop = await prisma.barbershop.create({
-    data: {
-      name,
-      address,
-      imageUrl: imageUrl,
-    },
-  });
-
-  for (const service of services) {
-    await prisma.service.create({
-      data: {
-        name: service.name,
-        description: service.description,
-        price: service.price,
-        barbershop: {
-          connect: {
-            id: barbershop.id,
-          },
+      const barbershop = await prisma.barbershop.create({
+        data: {
+          name,
+          address,
+          imageUrl: imageUrl,
         },
-        imageUrl: service.imageUrl,
-      },
-    });
-  }
+      });
 
-  barbershops.push(barbershop); // Adicione cada barbearia ao array
-}
+      for (const service of services) {
+        await prisma.service.create({
+          data: {
+            name: service.name,
+            description: service.description,
+            price: service.price,
+            barbershop: {
+              connect: {
+                id: barbershop.id,
+              },
+            },
+            imageUrl: service.imageUrl,
+          },
+        });
+      }
 
-// Agora você pode usar o array barbershops conforme necessário
-
+      barbershops.push(barbershop); // Adicione cada barbearia ao array
+    }
 
     // Fechar a conexão com o banco de dados
     await prisma.$disconnect();
