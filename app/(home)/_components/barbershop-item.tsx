@@ -29,12 +29,7 @@ const BarbershopItem = ({ barbershop }: BarbershopItemProps) => {
               <span className="text-xs">5,0</span>
             </Badge>
           </div>
-          <div className="absolute top-2 right-3 z-50">
-            <Badge variant="secondary" className="opacity-90 flex gap-1 items-center top-3 left-3">
-              <StarIcon size={12} className="fill-primary text-primary" />
-              <span className="text-xs">Em breve</span>
-            </Badge>
-          </div>
+        
           <Image
             alt={barbershop.name}
             src={barbershop.imageUrl}
