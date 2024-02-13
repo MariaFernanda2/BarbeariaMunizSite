@@ -12,8 +12,8 @@ async function seedDatabase() {
 
 
     const images = [
-      "https://utfs.io/f/c97a2dc9-cf62-468b-a851-bfd2bdde775f-16p.png",
-      "https://utfs.io/f/45331760-899c-4b4b-910e-e00babb6ed81-16q.png",
+      "https://utfs.io/f/7b5ef062-eade-49d2-b1d0-0dc43b27074b-26gp.PNG",
+      "https://utfs.io/f/be200e80-0cd7-40d7-be3a-d3e2e7de489d-wohl99.webp",
     ];
 
     // Nomes das barbearias
@@ -54,21 +54,21 @@ async function seedDatabase() {
         description: "Expressão acentuada com modelagem precisa.",
         price: 10.0,
         imageUrl:
-          "https://utfs.io/f/2118f76e-89e4-43e6-87c9-8f157500c333-b0ps0b.png",
+          "https://utfs.io/f/96cc47a2-a459-446b-8db5-09c4a9d09444-fl396.jpg",
       },
       {
         name: "Penteado",
         description: "Acabamento perfeito para seu cabelo.",
         price: 25.0,
         imageUrl:
-          "https://utfs.io/f/c4919193-a675-4c47-9f21-ebd86d1c8e6a-4oen2a.png",
+          "https://utfs.io/f/0cfc142a-3b1e-4311-a48e-f838977439f9-2225fi.jpg",
       },
       {
         name: "Alisante/Relaxamento",
         description: "Deixe seu cabelo liso e com uma aparência mais natural",
         price: 25.0,
         imageUrl:
-          "https://utfs.io/f/8a457cda-f768-411d-a737-cdb23ca6b9b5-b3pegf.png",
+          "https://utfs.io/f/20905ade-28e4-4de3-8ebc-511c55b8d827-8vlao.PNG",
       },
       {
         name: "Pigmentação",
@@ -82,28 +82,21 @@ async function seedDatabase() {
         description: "Luzes e reflexos perfeitos para seu momento",
         price: 60.0,
         imageUrl:
-          "https://utfs.io/f/8a457cda-f768-411d-a737-cdb23ca6b9b5-b3pegf.png",
+          "https://utfs.io/f/e3a14159-99e0-4a44-83f5-356ac3f9a2bf-u3521m.jpg",
       },
       {
         name: "Platinado",
         description: "Platinado perfeito para uma mudança de estilo radical",
         price: 150.0,
         imageUrl:
-          "https://utfs.io/f/8a457cda-f768-411d-a737-cdb23ca6b9b5-b3pegf.png",
+          "https://utfs.io/f/61cd1d29-dce7-4b31-b719-9f3446c2248a-fkrunw.26.54.jpeg",
       },
       {
         name: "Progressiva",
         description: "Cabelo alinhado, hidratado e liso",
         price: 150.0,
         imageUrl:
-          "https://utfs.io/f/8a457cda-f768-411d-a737-cdb23ca6b9b5-b3pegf.png",
-      },
-      {
-        name: "Limpeza simples de pele com hidratação",
-        description: "Deixe sua pele limpa e hidratada",
-        price: 25.0,
-        imageUrl:
-          "https://utfs.io/f/8a457cda-f768-411d-a737-cdb23ca6b9b5-b3pegf.png",
+          "https://utfs.io/f/98de6850-1c0b-4644-86ee-4643ce4acb1e-fkrunw.26.50.jpeg",
       },
       
     ];
