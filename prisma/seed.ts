@@ -4,16 +4,19 @@ const prisma = new PrismaClient();
 
 async function seedDatabase() {
   try {
-    // Deletar todos os serviços, barbeiros e barbearias existentes
+    // Deletar todos os dados existentes
     await prisma.booking.deleteMany({});
     await prisma.service.deleteMany({});
     await prisma.barber.deleteMany({});
     await prisma.barbershop.deleteMany({});
 
-    const barbearias = [
-      {name:"Barbearia Muniz - Centro de Cotia", address:"Rua Guido Fecchio, 626", imageUrl:"https://utfs.io/f/7b5ef062-eade-49d2-b1d0-0dc43b27074b-26gp.PNG"},
-      {name:"Barbearia Muniz - Granja Vianna", address:"N/A", imageUrl:"https://utfs.io/f/be200e80-0cd7-40d7-be3a-d3e2e7de489d-wohl99.webp"},
-    ];
+    const novaBarbearia = await prisma.barbershop.create({
+      data: {
+        name: 'Barbearia Muniz - Centro de Cotia',
+        address: 'Rua Guido Fecchio, 626',
+        imageUrl: 'https://utfs.io/f/7b5ef062-eade-49d2-b1d0-0dc43b27074b-26gp.PNG',
+      },
+    });
 
     const barbeiros = [
       { name: "Matheus Muniz", imageUrl: "https://utfs.io/f/b80ed175-fdbf-4368-8f16-7b406607bddf-dwpqd7.PNG" },
@@ -83,61 +86,44 @@ async function seedDatabase() {
         imageUrl: "https://utfs.io/f/98de6850-1c0b-4644-86ee-4643ce4acb1e-fkrunw.26.50.jpeg",
       },
     ];
-    // Criar barbearias
-    for (const barbearia of barbearias) {
-      await prisma.barbershop.create({
-        data: {
-          name: barbearia.name,
-          address: barbearia.address,
-          imageUrl: barbearia.imageUrl,
-        }
-      });
-    }
 
-    // Criar serviços e associá-los às barbearias
-    for (const barbearia of barbearias) {
-      const createdBarbershop = await prisma.barbershop.findUnique({
-        where: {
-          name: barbearia.name,
-        },
-      });
-
-      for (const service of services) {
-        await prisma.service.create({
-          data: {
-            ...service,
-            barbershop: {
-              connect: {
-                id: createdBarbershop.id,
-              },
-            },
-          },
-        });
-      }
-    }
-
-    // Criar barbeiros e associá-los às barbearias
+    
     for (const barbeiro of barbeiros) {
-      const createdBarbershop = await prisma.barbershop.findFirst();
-
       await prisma.barber.create({
         data: {
           name: barbeiro.name,
           imageUrl: barbeiro.imageUrl,
           barbershop: {
             connect: {
-              id: createdBarbershop.id,
+              id: novaBarbearia.id,
             },
           },
         },
       });
     }
 
-    // Fechar a conexão com o banco de dados
-    await prisma.$disconnect();
+    // Associar serviços à barbearia
+    for (const servico of services) {
+      await prisma.service.create({
+        data: {
+          name: servico.name,
+          price: servico.price,
+          description: servico.description,
+          imageUrl: servico.imageUrl,
+          barbershop: {
+            connect: {
+              id: novaBarbearia.id,
+            },
+          },
+        },
+      });
+    }
+
+    console.log('Dados populados com sucesso!');
   } catch (error) {
-    console.error("Erro ao criar as barbearias:", error);
+    console.error('Erro ao popular dados:', error);
   }
 }
 
+// Chamar a função seedDatabase para iniciar o processo de seeding do banco de dados
 seedDatabase();

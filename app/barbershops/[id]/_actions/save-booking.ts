@@ -8,18 +8,26 @@ interface SaveBookingParams {
   serviceId: string;
   userId: string;
   date: Date;
+  barberId: string;
 }
 
 export const saveBooking = async (params: SaveBookingParams) => {
-  await db.booking.create({
-    data: {
-      serviceId: params.serviceId,
-      userId: params.userId,
-      date: params.date,
-      barbershopId: params.barbershopId,
-    },
-  });
+  try {
+    // Crie a reserva incluindo o barberId fornecido
+    await db.booking.create({
+      data: {
+        serviceId: params.serviceId,
+        userId: params.userId,
+        date: params.date,
+        barbershopId: params.barbershopId,
+        barberId: params.barberId, 
+      },
+    });
 
-  revalidatePath("/");
-  revalidatePath("/bookings");
+    revalidatePath("/");
+    revalidatePath("/bookings");
+  } catch (error) {
+    console.error("Erro ao salvar reserva:", error);
+    throw error; 
+  }
 };
