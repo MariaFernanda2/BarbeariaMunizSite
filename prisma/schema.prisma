@@ -28,6 +28,7 @@ model Barbershop {
   imageUrl String
   services Service[]
   bookings Booking[]
+  barbers    Barber[]
 }
 
 model Service {
@@ -41,16 +42,29 @@ model Service {
   imageUrl     String
 }
 
+model Barber {
+  id          String     @id @default(uuid())
+  name        String
+  imageUrl    String
+  barbershopId String
+  barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
+  bookings    Booking[]
+}
+
 model Booking {
   id          String     @id @default(uuid())
   userId      String
   user        User       @relation(fields: [userId], references: [id])
   serviceId   String
   service     Service    @relation(fields: [serviceId], references: [id])
+  barberId    String     // Adicionado
+  barber      Barber     @relation(fields: [barberId], references: [id]) // Adicionado
   barbershopId String
   barbershop  Barbershop @relation(fields: [barbershopId], references: [id])
   date        DateTime
+  
 }
+
 
 model Account {
   id                String  @id @default(cuid())
