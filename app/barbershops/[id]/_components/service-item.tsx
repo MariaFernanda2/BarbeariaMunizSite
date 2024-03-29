@@ -81,6 +81,7 @@ const ServiceItem = ({ service, barbershop, isAuthenticated }: ServiceItemProps)
         barbershopId: barbershop.id,
         date: newDate,
         userId: (data.user as any).id,
+        barberId: "7b52ddfb-caf8-4468-abbf-5e8a3c99b7a3"
       });
 
       setSheetIsOpen(false);
