@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# ✂️ Barbearia Muniz — Site Oficial
 
-## Getting Started
+Bem-vindo(a) ao repositório da **Barbearia Muniz**, o site oficial da nossa barbearia — onde tradição, estilo e tecnologia se encontram.
 
-First, run the development server:
+Desenvolvido com **Next.js**, **Prisma**, **Tailwind CSS**, **ShadCN UI** e hospedado na **Vercel**, este projeto tem como objetivo oferecer uma experiência moderna para nossos clientes, com visualização de serviços e, em breve, funcionalidades de agendamento online.
+
+📍 **Acesse o site:**  
+👉 [app-barbearia-muniz.vercel.app](https://app-barbearia-muniz-fo5j-9bt510edr.vercel.app)
+
+---
+
+## 🌟 Funcionalidades atuais
+
+- 💇‍♂️ Visualização dos serviços oferecidos pela barbearia  
+- 📱 Layout responsivo, funcional e moderno  
+- 🎨 UI amigável com componentes acessíveis
+
+---
+
+## 🚧 Em desenvolvimento
+
+- 📅 Sistema de agendamento online  
+- 🔐 Área administrativa para gestão de horários  
+- 📲 Integração com WhatsApp para confirmação de agendamentos  
+- 🔔 Notificações para clientes
+
+---
+
+## 🛠️ Tecnologias utilizadas
+
+- **Next.js** – Framework fullstack para React
+- **React** – Biblioteca de interfaces reativas
+- **Tailwind CSS** – Utilitários para estilização rápida e responsiva
+- **ShadCN UI** – Componentes acessíveis e elegantes
+- **Prisma ORM** – Mapeamento objeto-relacional para banco de dados
+- **Vercel** – Hospedagem e deploy automático
+
+---
+
+## ▶️ Como rodar localmente
 
 ```bash
+# Clone o repositório
+git clone https://github.com/seu-usuario/barbearia-muniz.git
+
+# Acesse o diretório
+cd barbearia-muniz
+
+# Instale as dependências
+npm install
+
+# Configure o banco de dados
+npx prisma migrate dev
+
+# Rode o projeto
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+
 ```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 📬 Contato
+-👤 Desenvolvedora: Maria Fernanda (Mafê)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+-💈 Instagram da Barbearia Muniz: [(https://www.instagram.com/barbeiro_muniz/)]
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+Você não precisa saber tudo para começar.
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+"Mas precisa começar para conquistar tudo o que merece. 💜"
