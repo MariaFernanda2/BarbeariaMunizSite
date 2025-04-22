@@ -4,8 +4,6 @@ Bem-vindo(a) ao repositório da **Barbearia Muniz**, o site oficial da nossa bar
 
 Desenvolvido com **Next.js**, **Prisma**, **Tailwind CSS**, **ShadCN UI** e hospedado na **Vercel**, este projeto tem como objetivo oferecer uma experiência moderna para nossos clientes, com visualização de serviços e, em breve, funcionalidades de agendamento online.
 
-📍 **Acesse o site:**  
-👉 [app-barbearia-muniz.vercel.app](https://app-barbearia-muniz-fo5j-9bt510edr.vercel.app)
 
 ---
 
