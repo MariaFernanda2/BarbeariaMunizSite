@@ -7,7 +7,7 @@ import { db } from "../_lib/prisma";
 import BarbershopItem from "./_components/barbershop-item";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../_lib/auth";
-import { Barbershop, Booking } from "@prisma/client";
+import { Barbershop } from "@prisma/client";
 
 export default async function Home() {
   const session = await getServerSession(authOptions);
@@ -59,7 +59,7 @@ export default async function Home() {
           <>
             <h2 className="pl-5 text-xs mb-3 uppercase text-gray-400 font-bold">Agendamentos</h2>
             <div className="px-5 flex gap-3 overflow-x-auto [&::-webkit-scrollbar]:hidden">
-              {confirmedBookings.map((booking: Booking) => (
+              {confirmedBookings.map((booking) => (
                 <BookingItem key={booking.id} booking={booking} />
               ))}
             </div>
