@@ -4,7 +4,9 @@ import { Button } from "@/app/_components/ui/button";
 import { Calendar } from "@/app/_components/ui/calendar";
 import { Card, CardContent } from "@/app/_components/ui/card";
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/app/_components/ui/sheet";
-import { Barbershop, Booking, Service } from "@prisma/client";
+
+// Importamos 'Barber' do prisma, e 'Barbershop' e 'Service'
+import { Barbershop, Booking, Service, Barber } from "@prisma/client"; 
 import { ptBR } from "date-fns/locale";
 import { signIn, useSession } from "next-auth/react";
 import Image from "next/image";
@@ -18,19 +20,28 @@ import { useRouter } from "next/navigation";
 import { getDayBookings } from "../_actions/get-day-bookings";
 import BookingInfo from "@/app/_components/booking-info";
 
+// 💡 NOVO TIPO: Define a Barbershop incluindo a lista de Barbeiros (Barber[])
+interface BarbershopWithBarbers extends Barbershop {
+  barbers: Barber[];
+}
+
 interface ServiceItemProps {
-  barbershop: Barbershop;
+  // Usamos o novo tipo, que agora casa com os dados carregados no page.tsx
+  barbershop: BarbershopWithBarbers; 
   service: Service;
   isAuthenticated: boolean;
 }
 
 const ServiceItem = ({ service, barbershop, isAuthenticated }: ServiceItemProps) => {
   const router = useRouter();
-
   const { data } = useSession();
 
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [hour, setHour] = useState<string | undefined>();
+  
+  // 1. NOVO ESTADO: Armazena o ID do barbeiro selecionado
+  const [barberId, setBarberId] = useState<string | undefined>(); 
+
   const [submitIsLoading, setSubmitIsLoading] = useState(false);
   const [sheetIsOpen, setSheetIsOpen] = useState(false);
   const [dayBookings, setDayBookings] = useState<Booking[]>([]);
@@ -67,7 +78,12 @@ const ServiceItem = ({ service, barbershop, isAuthenticated }: ServiceItemProps)
     setSubmitIsLoading(true);
 
     try {
-      if (!hour || !date || !data?.user) {
+      // 2. VALIDAÇÃO: Adicionar verificação se 'barberId' está selecionado
+      if (!hour || !date || !data?.user || !barberId) {
+        if (!barberId) {
+            toast.error("Por favor, selecione um barbeiro para continuar.");
+        }
+        setSubmitIsLoading(false);
         return;
       }
 
@@ -81,12 +97,15 @@ const ServiceItem = ({ service, barbershop, isAuthenticated }: ServiceItemProps)
         barbershopId: barbershop.id,
         date: newDate,
         userId: (data.user as any).id,
-        barberId: "7b52ddfb-caf8-4468-abbf-5e8a3c99b7a3"
+        barberId: barberId, // 3. CORREÇÃO: Usar o ID do barbeiro do estado
       });
 
+      // Resetar estados após a reserva
       setSheetIsOpen(false);
       setHour(undefined);
       setDate(undefined);
+      setBarberId(undefined); 
+      
       toast("Reserva realizada com sucesso!", {
         description: format(newDate, "'Para' dd 'de' MMMM 'às' HH':'mm'.'", {
           locale: ptBR,
@@ -98,6 +117,7 @@ const ServiceItem = ({ service, barbershop, isAuthenticated }: ServiceItemProps)
       });
     } catch (error) {
       console.error(error);
+      toast.error("Ocorreu um erro ao tentar realizar a reserva.");
     } finally {
       setSubmitIsLoading(false);
     }
@@ -152,6 +172,7 @@ const ServiceItem = ({ service, barbershop, isAuthenticated }: ServiceItemProps)
                   currency: "BRL",
                 }).format(Number(service.price))}
               </p>
+              
               <Sheet open={sheetIsOpen} onOpenChange={setSheetIsOpen}>
                 <SheetTrigger asChild>
                   <Button variant="secondary" onClick={handleBookingClick}>
@@ -163,6 +184,24 @@ const ServiceItem = ({ service, barbershop, isAuthenticated }: ServiceItemProps)
                   <SheetHeader className="text-left px-5 py-6 border-b border-solid border-secondary">
                     <SheetTitle>Fazer Reserva</SheetTitle>
                   </SheetHeader>
+
+                  {/* 4. SELECT DE BARBEIROS ADICIONADO AQUI */}
+                  <div className="py-6 px-5 border-b border-solid border-secondary">
+                      <label className="text-sm font-medium">Selecione o Barbeiro</label>
+                      <select
+                          className="w-full border rounded-lg p-2 mt-2 bg-transparent text-sm"
+                          value={barberId} 
+                          onChange={(e) => setBarberId(e.target.value)} 
+                      >
+                          <option value={undefined}>Escolha um barbeiro</option>
+                          {/* Mapeia a lista de barbeiros que veio do page.tsx */}
+                          {barbershop.barbers?.map((barber) => (
+                              <option key={barber.id} value={barber.id}>
+                                  {barber.name}
+                              </option>
+                          ))}
+                      </select>
+                  </div>
 
                   <div className="py-6">
                     <Calendar
@@ -217,17 +256,21 @@ const ServiceItem = ({ service, barbershop, isAuthenticated }: ServiceItemProps)
                     <BookingInfo
                       booking={{
                         barbershop: barbershop,
+                        service: service,
                         date:
                           date && hour
                             ? setMinutes(setHours(date, Number(hour.split(":")[0])), Number(hour.split(":")[1]))
                             : undefined,
-                        service: service,
                       }}
                     />
                   </div>
 
                   <SheetFooter className="px-5">
-                    <Button onClick={handleBookingSubmit} disabled={!hour || !date || submitIsLoading}>
+                    {/* 5. Habilita o botão apenas se TUDO estiver preenchido: hora, data e barbeiro */}
+                    <Button 
+                      onClick={handleBookingSubmit} 
+                      disabled={!hour || !date || !barberId || submitIsLoading}
+                    >
                       {submitIsLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Confirmar reserva
                     </Button>
