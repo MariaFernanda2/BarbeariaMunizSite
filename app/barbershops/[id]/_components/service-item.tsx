@@ -5,8 +5,7 @@ import { Calendar } from "@/app/_components/ui/calendar";
 import { Card, CardContent } from "@/app/_components/ui/card";
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/app/_components/ui/sheet";
 
-// Importamos 'Barber' do prisma, e 'Barbershop' e 'Service'
-import { Barbershop, Booking, Service, Barber } from "@prisma/client"; 
+import { Barbershop, Booking, Service, Barber } from "@prisma/client";
 import { ptBR } from "date-fns/locale";
 import { signIn, useSession } from "next-auth/react";
 import Image from "next/image";
@@ -19,15 +18,14 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { getDayBookings } from "../_actions/get-day-bookings";
 import BookingInfo from "@/app/_components/booking-info";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from "@/app/_components/ui/select"
 
-// 💡 NOVO TIPO: Define a Barbershop incluindo a lista de Barbeiros (Barber[])
 interface BarbershopWithBarbers extends Barbershop {
   barbers: Barber[];
 }
 
 interface ServiceItemProps {
-  // Usamos o novo tipo, que agora casa com os dados carregados no page.tsx
-  barbershop: BarbershopWithBarbers; 
+  barbershop: BarbershopWithBarbers;
   service: Service;
   isAuthenticated: boolean;
 }
@@ -38,9 +36,7 @@ const ServiceItem = ({ service, barbershop, isAuthenticated }: ServiceItemProps)
 
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [hour, setHour] = useState<string | undefined>();
-  
-  // 1. NOVO ESTADO: Armazena o ID do barbeiro selecionado
-  const [barberId, setBarberId] = useState<string | undefined>(); 
+  const [barberId, setBarberId] = useState<string | undefined>();
 
   const [submitIsLoading, setSubmitIsLoading] = useState(false);
   const [sheetIsOpen, setSheetIsOpen] = useState(false);
@@ -78,10 +74,9 @@ const ServiceItem = ({ service, barbershop, isAuthenticated }: ServiceItemProps)
     setSubmitIsLoading(true);
 
     try {
-      // 2. VALIDAÇÃO: Adicionar verificação se 'barberId' está selecionado
       if (!hour || !date || !data?.user || !barberId) {
         if (!barberId) {
-            toast.error("Por favor, selecione um barbeiro para continuar.");
+          toast.error("Por favor, selecione um barbeiro para continuar.");
         }
         setSubmitIsLoading(false);
         return;
@@ -97,15 +92,14 @@ const ServiceItem = ({ service, barbershop, isAuthenticated }: ServiceItemProps)
         barbershopId: barbershop.id,
         date: newDate,
         userId: (data.user as any).id,
-        barberId: barberId, // 3. CORREÇÃO: Usar o ID do barbeiro do estado
+        barberId: barberId,
       });
 
-      // Resetar estados após a reserva
       setSheetIsOpen(false);
       setHour(undefined);
       setDate(undefined);
-      setBarberId(undefined); 
-      
+      setBarberId(undefined);
+
       toast("Reserva realizada com sucesso!", {
         description: format(newDate, "'Para' dd 'de' MMMM 'às' HH':'mm'.'", {
           locale: ptBR,
@@ -172,7 +166,7 @@ const ServiceItem = ({ service, barbershop, isAuthenticated }: ServiceItemProps)
                   currency: "BRL",
                 }).format(Number(service.price))}
               </p>
-              
+
               <Sheet open={sheetIsOpen} onOpenChange={setSheetIsOpen}>
                 <SheetTrigger asChild>
                   <Button variant="secondary" onClick={handleBookingClick}>
@@ -180,95 +174,111 @@ const ServiceItem = ({ service, barbershop, isAuthenticated }: ServiceItemProps)
                   </Button>
                 </SheetTrigger>
 
-                <SheetContent className="p-0">
+                {/* 1. CORREÇÃO DE ROLAGEM: Adicionado 'flex flex-col h-full' para configurar o layout */}
+                <SheetContent className="p-0 flex flex-col h-full">
                   <SheetHeader className="text-left px-5 py-6 border-b border-solid border-secondary">
                     <SheetTitle>Fazer Reserva</SheetTitle>
                   </SheetHeader>
 
-                  {/* 4. SELECT DE BARBEIROS ADICIONADO AQUI */}
-                  <div className="py-6 px-5 border-b border-solid border-secondary">
+                  {/* 2. NOVO DIV: Contêiner de Conteúdo. 'flex-1' ocupa o espaço restante e 'overflow-y-auto' habilita a rolagem. */}
+                  <div className="flex-1 overflow-y-auto">
+
+                    {/* SELECT DE BARBEIROS */}
+                    <div className="py-6 px-5 border-b border-solid border-secondary">
                       <label className="text-sm font-medium">Selecione o Barbeiro</label>
-                      <select
-                          className="w-full border rounded-lg p-2 mt-2 bg-transparent text-sm"
-                          value={barberId} 
-                          onChange={(e) => setBarberId(e.target.value)} 
+
+                      <Select
+                        value={barberId}
+                        onValueChange={(value) => setBarberId(value)}
                       >
-                          <option value={undefined}>Escolha um barbeiro</option>
-                          {/* Mapeia a lista de barbeiros que veio do page.tsx */}
+                        <SelectTrigger className="w-full border rounded-lg p-2 mt-2 bg-transparent text-sm">
+                          <SelectValue placeholder="Escolha um barbeiro" />
+                        </SelectTrigger>
+
+                        <SelectContent className="rounded-lg border border-secondary bg-background text-sm">
                           {barbershop.barbers?.map((barber) => (
-                              <option key={barber.id} value={barber.id}>
-                                  {barber.name}
-                              </option>
+                            <SelectItem
+                              key={barber.id}
+                              value={barber.id}
+                              className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
+                            >
+                              {barber.name}
+                            </SelectItem>
                           ))}
-                      </select>
-                  </div>
-
-                  <div className="py-6">
-                    <Calendar
-                      mode="single"
-                      selected={date}
-                      onSelect={handleDateClick}
-                      locale={ptBR}
-                      fromDate={addDays(new Date(), 1)}
-                      styles={{
-                        head_cell: {
-                          width: "100%",
-                          textTransform: "capitalize",
-                        },
-                        cell: {
-                          width: "100%",
-                        },
-                        button: {
-                          width: "100%",
-                        },
-                        nav_button_previous: {
-                          width: "32px",
-                          height: "32px",
-                        },
-                        nav_button_next: {
-                          width: "32px",
-                          height: "32px",
-                        },
-                        caption: {
-                          textTransform: "capitalize",
-                        },
-                      }}
-                    />
-                  </div>
-
-                  {/* Mostrar lista de horários apenas se alguma data estiver selecionada */}
-                  {date && (
-                    <div className="flex gap-3 overflow-x-auto py-6 px-5 border-t border-solid border-secondary [&::-webkit-scrollbar]:hidden">
-                      {timeList.map((time) => (
-                        <Button
-                          onClick={() => handleHourClick(time)}
-                          variant={hour === time ? "default" : "outline"}
-                          className="rounded-full"
-                          key={time}
-                        >
-                          {time}
-                        </Button>
-                      ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                  )}
+                    {/* CALENDÁRIO */}
+                    <div className="py-6">
+                      <Calendar
+                        mode="single"
+                        selected={date}
+                        onSelect={handleDateClick}
+                        locale={ptBR}
+                        fromDate={addDays(new Date(), 1)}
+                        styles={{
+                          head_cell: {
+                            width: "100%",
+                            textTransform: "capitalize",
+                          },
+                          cell: {
+                            width: "100%",
+                          },
+                          button: {
+                            width: "100%",
+                          },
+                          nav_button_previous: {
+                            width: "32px",
+                            height: "32px",
+                          },
+                          nav_button_next: {
+                            width: "32px",
+                            height: "32px",
+                          },
+                          caption: {
+                            textTransform: "capitalize",
+                          },
+                        }}
+                      />
+                    </div>
 
-                  <div className="py-6 px-5 border-t border-solid border-secondary">
-                    <BookingInfo
-                      booking={{
-                        barbershop: barbershop,
-                        service: service,
-                        date:
-                          date && hour
-                            ? setMinutes(setHours(date, Number(hour.split(":")[0])), Number(hour.split(":")[1]))
-                            : undefined,
-                      }}
-                    />
-                  </div>
+                    {/* HORÁRIOS */}
+                    {date && (
+                      <div className="flex gap-3 overflow-x-auto py-6 px-5 border-t border-solid border-secondary [&::-webkit-scrollbar]:hidden">
+                        {timeList.map((time) => (
+                          <Button
+                            onClick={() => handleHourClick(time)}
+                            variant={hour === time ? "default" : "outline"}
+                            className="rounded-full"
+                            key={time}
+                          >
+                            {time}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
 
-                  <SheetFooter className="px-5">
-                    {/* 5. Habilita o botão apenas se TUDO estiver preenchido: hora, data e barbeiro */}
-                    <Button 
-                      onClick={handleBookingSubmit} 
+                    {/* BOOKING INFO */}
+                    <div className="py-6 px-5 border-t border-solid border-secondary">
+                      <BookingInfo
+                        booking={{
+                          barbershop: barbershop,
+                          service: service,
+                          date:
+                            date && hour
+                              ? setMinutes(setHours(date, Number(hour.split(":")[0])), Number(hour.split(":")[1]))
+                              : undefined,
+                        }}
+                      />
+                    </div>
+
+                  </div> {/* 👈 Fim do Contêiner que Rola */}
+
+
+                  {/* 3. RODAPÉ FIXO: Fica fora da área de rolagem */}
+                  <SheetFooter className="px-5 py-4 border-t border-solid border-secondary">
+                    <Button
+                      onClick={handleBookingSubmit}
                       disabled={!hour || !date || !barberId || submitIsLoading}
                     >
                       {submitIsLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
