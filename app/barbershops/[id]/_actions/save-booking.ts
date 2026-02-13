@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/app/_lib/prisma";
+import { db } from "@/app/lib/repositories/prisma";
 import { revalidatePath } from "next/cache";
 
 interface SaveBookingParams {

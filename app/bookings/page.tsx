@@ -1,9 +1,9 @@
 import { getServerSession } from "next-auth";
 import Header from "../_components/header";
 import { redirect } from "next/navigation";
-import { db } from "../_lib/prisma";
+import { db } from "../lib/repositories/prisma";
 import BookingItem from "../_components/booking-item";
-import { authOptions } from "../_lib/auth";
+import { authOptions } from "../lib/auth";
 import { Booking } from "@prisma/client";
 
 const BookingsPage = async () => {
