@@ -1,59 +1,83 @@
-// app/page/_components/quick-rebooking-action.tsx
 "use client";
 
-import { Barbershop, Booking, Service, Barber } from "@prisma/client";
-import { format } from "date-fns";
+import { format, setHours, setMinutes, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Button } from "@/app/_components/ui/button";
-import { Calendar } from "@/app/_components/ui/calendar";
-import { setHours, setMinutes, addDays } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
-import { generateDayTimeList } from "../../barbershops/[id]/_helpers/hours";
-import { getDayBookings } from "../../barbershops/[id]/_actions/get-day-bookings";
-import { saveBooking } from "../../barbershops/[id]/_actions/save-booking";
 import { useSession } from "next-auth/react";
-import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
-// Tipagem para o agendamento completo
-type LastBooking = Booking & {
+import { Button } from "@/app/_components/ui/button";
+import { Calendar } from "@/app/_components/ui/calendar";
+
+import { generateDayTimeList } from "../../barbershops/[id]/_helpers/hours";
+
+import {
+  Barber,
+  Service,
+  Barbershop,
+} from "@/app/types/booking";
+
+export interface LastBooking {
+  id: string;
+  date: string;
   barber: Barber;
   service: Service;
   barbershop: Barbershop;
-};
+}
 
 interface QuickRebookingActionProps {
   lastBooking: LastBooking;
   setSheetIsOpen: (isOpen: boolean) => void;
 }
 
-const QuickRebookingAction = ({ lastBooking, setSheetIsOpen }: QuickRebookingActionProps) => {
-  const router = useRouter();
-  const { data } = useSession();
-  
-  // Estados de Agendamento
-  const [date, setDate] = useState<Date | undefined>(undefined);
-  const [hour, setHour] = useState<string>(""); 
-  const [submitIsLoading, setSubmitIsLoading] = useState(false);
-  const [dayBookings, setDayBookings] = useState<Booking[]>([]);
+interface DayBooking {
+  id: string;
+  date: string;
+  barberId: string;
+}
 
-  // Barbeiro e Serviço são fixos com base no último agendamento
+const QuickRebookingAction = ({
+  lastBooking,
+  setSheetIsOpen,
+}: QuickRebookingActionProps) => {
+  const router = useRouter();
+  const { data: session } = useSession();
+
+  const [date, setDate] = useState<Date | undefined>(undefined);
+  const [hour, setHour] = useState<string>("");
+  const [submitIsLoading, setSubmitIsLoading] = useState(false);
+  const [dayBookings, setDayBookings] = useState<DayBooking[]>([]);
+
   const { barber, service, barbershop } = lastBooking;
 
-  // Lógica para buscar os agendamentos do dia (iguais ao ServiceItem)
+  // 🔹 Buscar bookings do dia via REST
   useEffect(() => {
     if (!date) return;
-    const refreshAvailableHours = async () => {
-      const _dayBookings = await getDayBookings(barbershop.id, date);
-      // Filtramos APENAS os agendamentos deste BARBEIRO para checar a disponibilidade
-      const barberBookings = _dayBookings.filter(booking => booking.barberId === barber.id);
-      setDayBookings(barberBookings);
+
+    const fetchDayBookings = async () => {
+      try {
+        const response = await fetch(
+          `/api/v1/bookings/day?barbershopId=${barbershop.id}&date=${date.toISOString()}`
+        );
+
+        const result = await response.json();
+
+        const barberBookings = result.data.filter(
+          (booking: DayBooking) => booking.barberId === barber.id
+        );
+
+        setDayBookings(barberBookings);
+      } catch (error) {
+        console.error(error);
+      }
     };
-    refreshAvailableHours();
+
+    fetchDayBookings();
   }, [date, barbershop.id, barber.id]);
 
-  // Lista de horários disponíveis (iguais ao ServiceItem)
+  // 🔹 Calcular horários disponíveis
   const timeList = useMemo(() => {
     if (!date) return [];
 
@@ -61,52 +85,71 @@ const QuickRebookingAction = ({ lastBooking, setSheetIsOpen }: QuickRebookingAct
       const [timeHour, timeMinutes] = time.split(":").map(Number);
 
       const bookingExists = dayBookings.some((booking) => {
-        const bookingHour = booking.date.getHours();
-        const bookingMinutes = booking.date.getMinutes();
-        return bookingHour === timeHour && bookingMinutes === timeMinutes;
+        const bookingDate = new Date(booking.date);
+        const bookingHour = bookingDate.getHours();
+        const bookingMinutes = bookingDate.getMinutes();
+
+        return (
+          bookingHour === timeHour &&
+          bookingMinutes === timeMinutes
+        );
       });
 
       return !bookingExists;
     });
   }, [date, dayBookings]);
 
+  // 🔹 Criar novo booking via REST
   const handleBookingSubmit = async () => {
+    if (!hour || !date || !session?.user) {
+      toast.error("Selecione data e horário.");
+      return;
+    }
+
     setSubmitIsLoading(true);
 
     try {
-      if (hour === "" || !date || !data?.user) {
-        toast.error("Por favor, selecione uma data e horário.");
-        setSubmitIsLoading(false);
-        return;
-      }
-
       const [dateHour, dateMinutes] = hour.split(":").map(Number);
-      const newDate = setMinutes(setHours(date, dateHour), dateMinutes);
+      const newDate = setMinutes(
+        setHours(date, dateHour),
+        dateMinutes
+      );
 
-      await saveBooking({
-        serviceId: service.id,
-        barbershopId: barbershop.id,
-        date: newDate,
-        userId: (data.user as any).id,
-        barberId: barber.id, // Barbeiro fixo!
+      const response = await fetch("/api/v1/bookings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          serviceId: service.id,
+          barbershopId: barbershop.id,
+          barberId: barber.id,
+          date: newDate.toISOString(),
+        }),
       });
+
+      if (!response.ok) {
+        throw new Error("Erro ao criar agendamento");
+      }
 
       setSheetIsOpen(false);
       setDate(undefined);
       setHour("");
 
-      toast("Reagendamento Rápido Realizado!", {
-        description: format(newDate, `'Corte com ${barber.name} para' dd 'de' MMMM 'às' HH':'mm'.'`, {
-          locale: ptBR,
-        }),
+      toast("Reagendamento realizado!", {
+        description: format(
+          newDate,
+          `'Corte com ${barber.name} para' dd 'de' MMMM 'às' HH':'mm`,
+          { locale: ptBR }
+        ),
         action: {
-          label: "Visualizar",
+          label: "Ver Agendamentos",
           onClick: () => router.push("/bookings"),
         },
       });
     } catch (error) {
       console.error(error);
-      toast.error("Ocorreu um erro ao tentar realizar o reagendamento.");
+      toast.error("Erro ao realizar reagendamento.");
     } finally {
       setSubmitIsLoading(false);
     }
@@ -114,68 +157,64 @@ const QuickRebookingAction = ({ lastBooking, setSheetIsOpen }: QuickRebookingAct
 
   return (
     <div className="flex-1 overflow-y-auto flex flex-col h-full">
-      {/* 1. SEÇÃO DE CONFIRMAÇÃO (O POP-UP) */}
+      {/* HEADER */}
       <div className="p-5 border-b border-secondary">
-        <h3 className="font-bold text-lg mb-2">Reagendamento Rápido</h3>
-        <p className="text-sm text-gray-400">
-          Deseja agendar novamente o seu último serviço:
-        </p>
-        
-        {/* Cartão de Info */}
+        <h3 className="font-bold text-lg mb-2">
+          Reagendamento Rápido
+        </h3>
+
         <div className="mt-3 p-4 border border-primary rounded-lg bg-primary/10">
           <p className="font-bold">{service.name}</p>
-          <p className="text-sm">Com: **{barber.name}**</p>
-          <p className="text-xs text-gray-500">{barbershop.name}</p>
+          <p className="text-sm">Com: {barber.name}</p>
+          <p className="text-xs text-gray-500">
+            {barbershop.name}
+          </p>
         </div>
       </div>
-      
-      {/* 2. CALENDÁRIO */}
+
+      {/* CALENDÁRIO */}
       <div className="py-6 border-b border-secondary flex justify-center">
         <Calendar
           mode="single"
           selected={date}
           onSelect={setDate}
           locale={ptBR}
-          fromDate={addDays(new Date(), 1)} // Permite agendar a partir de amanhã
-          styles={{ 
-            // ... Seus estilos do calendário ... 
-            head_cell: { width: "100%", textTransform: "capitalize" },
-            cell: { width: "100%" },
-            button: { width: "100%" },
-            nav_button_previous: { width: "32px", height: "32px" },
-            nav_button_next: { width: "32px", height: "32px" },
-            caption: { textTransform: "capitalize" },
-          }}
+          fromDate={addDays(new Date(), 1)}
         />
       </div>
 
-      {/* 3. HORÁRIOS */}
+      {/* HORÁRIOS */}
       {date && (
-        <div className="flex gap-3 overflow-x-auto py-6 px-5 border-b border-solid border-secondary [&::-webkit-scrollbar]:hidden">
+        <div className="flex gap-3 overflow-x-auto py-6 px-5 border-b border-secondary">
           {timeList.map((time) => (
             <Button
+              key={time}
               onClick={() => setHour(time)}
               variant={hour === time ? "default" : "outline"}
               className="rounded-full shrink-0"
-              key={time}
             >
               {time}
             </Button>
           ))}
+
           {timeList.length === 0 && (
-             <p className="text-gray-400 text-sm">Nenhum horário disponível com {barber.name} neste dia.</p>
+            <p className="text-gray-400 text-sm">
+              Nenhum horário disponível com {barber.name}
+            </p>
           )}
         </div>
       )}
 
-      {/* RODAPÉ E BOTÃO DE SUBMISSÃO */}
+      {/* BOTÃO */}
       <div className="p-5 border-t border-secondary mt-auto">
         <Button
           onClick={handleBookingSubmit}
-          disabled={!hour || !date || submitIsLoading || timeList.length === 0}
+          disabled={!hour || !date || submitIsLoading}
           className="w-full"
         >
-          {submitIsLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {submitIsLoading && (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          )}
           Confirmar Reagendamento
         </Button>
       </div>

@@ -3,7 +3,13 @@
 import { Button } from "@/app/_components/ui/button";
 import { Calendar } from "@/app/_components/ui/calendar";
 import { Card, CardContent } from "@/app/_components/ui/card";
-import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/app/_components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/app/_components/ui/sheet";
 
 import { Barbershop, Booking, Service, Barber } from "@prisma/client";
 import { ptBR } from "date-fns/locale";
@@ -12,13 +18,17 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { generateDayTimeList } from "../_helpers/hours";
 import { addDays, format, setHours, setMinutes } from "date-fns";
-import { saveBooking } from "../_actions/save-booking";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { getDayBookings } from "../_actions/get-day-bookings";
 import BookingInfo from "@/app/_components/booking-info";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from "@/app/_components/ui/select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/app/_components/ui/select";
 
 interface BarbershopWithBarbers extends Barbershop {
   barbers: Barber[];
@@ -27,117 +37,135 @@ interface BarbershopWithBarbers extends Barbershop {
 interface ServiceItemProps {
   barbershop: BarbershopWithBarbers;
   service: Service;
-  isAuthenticated: boolean;
 }
 
-const ServiceItem = ({ service, barbershop, isAuthenticated }: ServiceItemProps) => {
+const ServiceItem = ({ service, barbershop }: ServiceItemProps) => {
   const router = useRouter();
-  const { data } = useSession();
+  const { data: session, status } = useSession();
 
-  const [date, setDate] = useState<Date | undefined>(undefined);
-  const [hour, setHour] = useState<string | undefined>();
-  const [barberId, setBarberId] = useState<string | undefined>();
+  const [date, setDate] = useState<Date>();
+  const [hour, setHour] = useState<string>();
+  const [barberId, setBarberId] = useState<string>();
 
   const [submitIsLoading, setSubmitIsLoading] = useState(false);
   const [sheetIsOpen, setSheetIsOpen] = useState(false);
   const [dayBookings, setDayBookings] = useState<Booking[]>([]);
 
+  // Buscar agendamentos do dia
   useEffect(() => {
-    if (!date) {
+    if (!date) return;
+
+    const fetchDayBookings = async () => {
+      try {
+        const response = await fetch(
+          `/api/v1/bookings/day?barbershopId=${barbershop.id}&date=${date.toISOString()}`
+        );
+
+        const data = await response.json();
+        setDayBookings(data);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    fetchDayBookings();
+  }, [date, barbershop.id]);
+
+  // 🔥 Controle correto de autenticação
+  const handleBookingClick = async () => {
+    if (status === "loading") return;
+
+    if (!session) {
+      await signIn("google", {
+        callbackUrl: window.location.href,
+      });
       return;
     }
 
-    const refreshAvailableHours = async () => {
-      const _dayBookings = await getDayBookings(barbershop.id, date);
-      setDayBookings(_dayBookings);
-    };
-
-    refreshAvailableHours();
-  }, [date, barbershop.id]);
-
-  const handleDateClick = (date: Date | undefined) => {
-    setDate(date);
-    setHour(undefined);
+    setSheetIsOpen(true);
   };
 
-  const handleHourClick = (time: string) => {
-    setHour(time);
-  };
+const handleBookingSubmit = async () => {
+  if (!hour || !date || !barberId) {
+    console.log("Dados incompletos", { hour, date, barberId });
+    return;
+  }
 
-  const handleBookingClick = () => {
-    if (!isAuthenticated) {
-      return signIn("google");
-    }
-  };
+  if (!session?.user?.id) {
+    console.log("Usuário sem ID na sessão", session);
+    toast.error("Você precisa estar logado para reservar");
+    return;
+  }
 
-  const handleBookingSubmit = async () => {
-    setSubmitIsLoading(true);
+  setSubmitIsLoading(true);
 
-    try {
-      if (!hour || !date || !data?.user || !barberId) {
-        if (!barberId) {
-          toast.error("Por favor, selecione um barbeiro para continuar.");
-        }
-        setSubmitIsLoading(false);
-        return;
-      }
+  try {
+    const dateHour = Number(hour.split(":")[0]);
+    const dateMinutes = Number(hour.split(":")[1]);
+    const bookingDate = setMinutes(setHours(date, dateHour), dateMinutes);
 
-      const dateHour = Number(hour.split(":")[0]);
-      const dateMinutes = Number(hour.split(":")[1]);
+    console.log("ENVIANDO BOOKING...", {
+      userId: session.user.id,
+      serviceId: service.id,
+      barberId,
+      date: bookingDate.toISOString(),
+    });
 
-      const newDate = setMinutes(setHours(date, dateHour), dateMinutes);
-
-      await saveBooking({
+    const response = await fetch("/api/v1/bookings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: session.user.id,
         serviceId: service.id,
+        barberId,
         barbershopId: barbershop.id,
-        date: newDate,
-        userId: (data.user as any).id,
-        barberId: barberId,
-      });
+        date: bookingDate.toISOString(),
+      }),
+    });
 
-      setSheetIsOpen(false);
-      setHour(undefined);
-      setDate(undefined);
-      setBarberId(undefined);
+    const result = await response.json();
+    console.log("RESPOSTA BOOKING:", result);
 
-      toast("Reserva realizada com sucesso!", {
-        description: format(newDate, "'Para' dd 'de' MMMM 'às' HH':'mm'.'", {
-          locale: ptBR,
-        }),
-        action: {
-          label: "Visualizar",
-          onClick: () => router.push("/bookings"),
-        },
-      });
-    } catch (error) {
-      console.error(error);
-      toast.error("Ocorreu um erro ao tentar realizar a reserva.");
-    } finally {
-      setSubmitIsLoading(false);
+    if (!response.ok) {
+      throw new Error(result.message || "Erro ao criar reserva");
     }
-  };
+
+    setSheetIsOpen(false);
+    setHour(undefined);
+    setDate(undefined);
+    setBarberId(undefined);
+
+    toast("Reserva realizada com sucesso!", {
+      description: format(
+        bookingDate,
+        "'Para' dd 'de' MMMM 'às' HH':'mm'.'",
+        { locale: ptBR }
+      ),
+      action: { label: "Visualizar", onClick: () => router.push("/bookings") },
+    });
+  } catch (error: any) {
+    console.error("HANDLE BOOKING ERROR:", error);
+    toast.error(error.message || "Erro ao realizar reserva");
+  } finally {
+    setSubmitIsLoading(false);
+  }
+};
 
   const timeList = useMemo(() => {
-    if (!date) {
-      return [];
-    }
+    if (!date) return [];
 
     return generateDayTimeList(date).filter((time) => {
-      const timeHour = Number(time.split(":")[0]);
-      const timeMinutes = Number(time.split(":")[1]);
+      const [hourStr, minuteStr] = time.split(":");
 
-      const booking = dayBookings.find((booking) => {
-        const bookingHour = booking.date.getHours();
-        const bookingMinutes = booking.date.getMinutes();
+      return !dayBookings.find((booking) => {
+        const bookingHour = new Date(booking.date).getHours();
+        const bookingMinute = new Date(booking.date).getMinutes();
 
-        return bookingHour === timeHour && bookingMinutes === timeMinutes;
+        return (
+          bookingHour === Number(hourStr) &&
+          bookingMinute === Number(minuteStr)
+        );
       });
-
-      if (!booking) {
-        return true;
-      }
-
-      return false;
     });
   }, [date, dayBookings]);
 
@@ -167,130 +195,91 @@ const ServiceItem = ({ service, barbershop, isAuthenticated }: ServiceItemProps)
                 }).format(Number(service.price))}
               </p>
 
-              <Sheet open={sheetIsOpen} onOpenChange={setSheetIsOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="secondary" onClick={handleBookingClick}>
-                    Reservar
-                  </Button>
-                </SheetTrigger>
-
-                {/* 1. CORREÇÃO DE ROLAGEM: Adicionado 'flex flex-col h-full' para configurar o layout */}
-                <SheetContent className="p-0 flex flex-col h-full">
-                  <SheetHeader className="text-left px-5 py-6 border-b border-solid border-secondary">
-                    <SheetTitle>Fazer Reserva</SheetTitle>
-                  </SheetHeader>
-
-                  {/* 2. NOVO DIV: Contêiner de Conteúdo. 'flex-1' ocupa o espaço restante e 'overflow-y-auto' habilita a rolagem. */}
-                  <div className="flex-1 overflow-y-auto">
-
-                    {/* SELECT DE BARBEIROS */}
-                    <div className="py-6 px-5 border-b border-solid border-secondary">
-                      <label className="text-sm font-medium">Selecione o Barbeiro</label>
-
-                      <Select
-                        value={barberId}
-                        onValueChange={(value) => setBarberId(value)}
-                      >
-                        <SelectTrigger className="w-full border rounded-lg p-2 mt-2 bg-transparent text-sm">
-                          <SelectValue placeholder="Escolha um barbeiro" />
-                        </SelectTrigger>
-
-                        <SelectContent className="rounded-lg border border-secondary bg-background text-sm">
-                          {barbershop.barbers?.map((barber) => (
-                            <SelectItem
-                              key={barber.id}
-                              value={barber.id}
-                              className="cursor-pointer hover:bg-accent hover:text-accent-foreground"
-                            >
-                              {barber.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {/* CALENDÁRIO */}
-                    <div className="py-6">
-                      <Calendar
-                        mode="single"
-                        selected={date}
-                        onSelect={handleDateClick}
-                        locale={ptBR}
-                        fromDate={addDays(new Date(), 1)}
-                        styles={{
-                          head_cell: {
-                            width: "100%",
-                            textTransform: "capitalize",
-                          },
-                          cell: {
-                            width: "100%",
-                          },
-                          button: {
-                            width: "100%",
-                          },
-                          nav_button_previous: {
-                            width: "32px",
-                            height: "32px",
-                          },
-                          nav_button_next: {
-                            width: "32px",
-                            height: "32px",
-                          },
-                          caption: {
-                            textTransform: "capitalize",
-                          },
-                        }}
-                      />
-                    </div>
-
-                    {/* HORÁRIOS */}
-                    {date && (
-                      <div className="flex gap-3 overflow-x-auto py-6 px-5 border-t border-solid border-secondary [&::-webkit-scrollbar]:hidden">
-                        {timeList.map((time) => (
-                          <Button
-                            onClick={() => handleHourClick(time)}
-                            variant={hour === time ? "default" : "outline"}
-                            className="rounded-full"
-                            key={time}
-                          >
-                            {time}
-                          </Button>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* BOOKING INFO */}
-                    <div className="py-6 px-5 border-t border-solid border-secondary">
-                      <BookingInfo
-                        booking={{
-                          barbershop: barbershop,
-                          service: service,
-                          date:
-                            date && hour
-                              ? setMinutes(setHours(date, Number(hour.split(":")[0])), Number(hour.split(":")[1]))
-                              : undefined,
-                        }}
-                      />
-                    </div>
-
-                  </div> {/* 👈 Fim do Contêiner que Rola */}
-
-
-                  {/* 3. RODAPÉ FIXO: Fica fora da área de rolagem */}
-                  <SheetFooter className="px-5 py-4 border-t border-solid border-secondary">
-                    <Button
-                      onClick={handleBookingSubmit}
-                      disabled={!hour || !date || !barberId || submitIsLoading}
-                    >
-                      {submitIsLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Confirmar reserva
-                    </Button>
-                  </SheetFooter>
-                </SheetContent>
-              </Sheet>
+              <Button variant="secondary" onClick={handleBookingClick}>
+                Reservar
+              </Button>
             </div>
           </div>
         </div>
       </CardContent>
+
+      <Sheet open={sheetIsOpen} onOpenChange={setSheetIsOpen}>
+        <SheetContent className="p-0 flex flex-col h-full">
+          <SheetHeader className="text-left px-5 py-6 border-b border-secondary">
+            <SheetTitle>Fazer Reserva</SheetTitle>
+          </SheetHeader>
+
+          <div className="flex-1 overflow-y-auto">
+            <div className="py-6 px-5 border-b border-secondary">
+              <Select value={barberId} onValueChange={setBarberId}>
+                <SelectTrigger className="w-full mt-2">
+                  <SelectValue placeholder="Escolha um barbeiro" />
+                </SelectTrigger>
+                <SelectContent>
+                  {barbershop.barbers?.map((barber) => (
+                    <SelectItem key={barber.id} value={barber.id}>
+                      {barber.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="py-6">
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={setDate}
+                locale={ptBR}
+                fromDate={addDays(new Date(), 1)}
+              />
+            </div>
+
+            {date && (
+              <div className="flex gap-3 overflow-x-auto py-6 px-5 border-t border-secondary">
+                {timeList.map((time) => (
+                  <Button
+                    key={time}
+                    onClick={() => setHour(time)}
+                    variant={hour === time ? "default" : "outline"}
+                    className="rounded-full"
+                  >
+                    {time}
+                  </Button>
+                ))}
+              </div>
+            )}
+
+            <div className="py-6 px-5 border-t border-secondary">
+              <BookingInfo
+                booking={{
+                  barbershop,
+                  service,
+                  date:
+                    date && hour
+                      ? setMinutes(
+                          setHours(date, Number(hour.split(":")[0])),
+                          Number(hour.split(":")[1])
+                        )
+                      : undefined,
+                }}
+              />
+            </div>
+          </div>
+
+          <SheetFooter className="px-5 py-4 border-t border-secondary">
+            <Button
+              onClick={handleBookingSubmit}
+              disabled={!hour || !date || !barberId || submitIsLoading}
+            >
+              {submitIsLoading && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Confirmar reserva
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </Card>
   );
 };
