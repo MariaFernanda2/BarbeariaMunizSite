@@ -9,7 +9,6 @@ import { ptBR } from "date-fns/locale";
 import { Sheet, SheetClose, SheetContent, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
 import Image from "next/image";
 import { Button } from "./ui/button";
-import { cancelBooking } from "../_actions/cancel-booking";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -40,19 +39,25 @@ const BookingItem = ({ booking }: BookingItemProps) => {
 
   const isBookingConfirmed = isFuture(booking.date);
 
-  const handleCancelClick = async () => {
-    setIsDeleteLoading(true);
+const handleCancelClick = async () => {
+  setIsDeleteLoading(true);
 
-    try {
-      await cancelBooking(booking.id);
+  try {
+    const response = await fetch(`/api/v1/bookings/${booking.id}`, {
+      method: "DELETE",
+    });
 
-      toast.success("Reserva cancelada com sucesso!");
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsDeleteLoading(false);
+    if (!response.ok) {
+      throw new Error();
     }
-  };
+
+    toast.success("Reserva cancelada com sucesso!");
+  } catch (error) {
+    toast.error("Erro ao cancelar reserva.");
+  } finally {
+    setIsDeleteLoading(false);
+  }
+};
 
   return (
     <Sheet>
