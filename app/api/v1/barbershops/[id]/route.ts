@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { BarbershopService } from "@/app/lib/services/barbershop.service";
+import { BarbershopRepository } from "@/app/lib/repositories/barbershop.repository";
 import { AppError } from "@/app/lib/errors/app-error";
 
 export async function GET(
@@ -9,7 +10,13 @@ export async function GET(
   try {
     const { id } = context.params;
 
-    const service = new BarbershopService();
+    // 1️⃣ Cria a instância do repositório
+    const repository = new BarbershopRepository();
+
+    // 2️⃣ Passa o repositório para o serviço
+    const service = new BarbershopService(repository);
+
+    // 3️⃣ Busca a barbearia
     const barbershop = await service.findById(id);
 
     return NextResponse.json(
@@ -30,6 +37,7 @@ export async function GET(
       );
     }
 
+    console.error(error);
     return NextResponse.json(
       {
         success: false,
