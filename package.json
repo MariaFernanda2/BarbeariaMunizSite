@@ -26,6 +26,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "date-fns": "^3.3.1",
+    "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.319.0",
     "next": "14.1.0",
     "next-auth": "^4.24.11",
@@ -51,6 +52,7 @@
   "devDependencies": {
     "@fortawesome/free-brands-svg-icons": "^6.5.1",
     "@fortawesome/react-fontawesome": "^0.2.0",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
     "@types/react": "^18.2.55",
     "@types/react-dom": "^18",
