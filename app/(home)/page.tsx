@@ -1,7 +1,9 @@
 // app/page.tsx
+
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { getServerSession } from "next-auth";
+import { headers } from "next/headers";
 
 import { authOptions } from "@/app/lib/auth";
 import Header from "@/app/_components/header";
@@ -14,27 +16,31 @@ export default async function Home() {
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id;
 
-  // Faz as requisições em paralelo
-const [barbershopsRes, bookingsRes, lastBookingRes] = await Promise.all([
-  fetch(`${process.env.NEXTAUTH_URL ?? ""}/api/v1/barbershops?page=1&limit=10`, {
-    cache: "no-store",
-  }),
-  userId
-    ? fetch(
-        `${process.env.NEXTAUTH_URL ?? ""}/api/v1/bookings?userId=${userId}`,
-        { cache: "no-store" }
-      )
-    : Promise.resolve(null),
-  userId
-    ? fetch(
-        `${process.env.NEXTAUTH_URL ?? ""}/api/v1/bookings/last-completed?userId=${userId}`,
-        { cache: "no-store" }
-      )
-    : Promise.resolve(null),
-]);
+  // 🔥 Base URL dinâmica (funciona em qualquer ambiente)
+  const host = headers().get("host");
+  const protocol = process.env.NODE_ENV === "production" ? "https" : "http";
+  const baseUrl = `${protocol}://${host}`;
 
+  // 🔥 Requests paralelas
+  const [barbershopsRes, bookingsRes, lastBookingRes] =
+    await Promise.all([
+      fetch(`${baseUrl}/api/v1/barbershops?page=1&limit=10`, {
+        cache: "no-store",
+      }),
+      userId
+        ? fetch(`${baseUrl}/api/v1/bookings?userId=${userId}`, {
+            cache: "no-store",
+          })
+        : Promise.resolve(null),
+      userId
+        ? fetch(
+            `${baseUrl}/api/v1/bookings/last-completed?userId=${userId}`,
+            { cache: "no-store" }
+          )
+        : Promise.resolve(null),
+    ]);
 
-  // Converte para JSON de forma segura
+  // 🔥 JSON seguro
   const barbershopsData = await barbershopsRes.json().catch(() => ({
     data: [],
   }));
@@ -47,10 +53,9 @@ const [barbershopsRes, bookingsRes, lastBookingRes] = await Promise.all([
     data: null,
   }));
 
-  // Dados finais para renderização
-  const recommendedBarbershops = barbershopsData.data || [];
-  const confirmedBookings = bookingsData?.data || [];
-  const lastCompletedBooking = lastBookingData?.data || null;
+  const recommendedBarbershops = barbershopsData?.data ?? [];
+  const confirmedBookings = bookingsData?.data ?? [];
+  const lastCompletedBooking = lastBookingData?.data ?? null;
 
   return (
     <div>
@@ -68,7 +73,7 @@ const [barbershopsRes, bookingsRes, lastBookingRes] = await Promise.all([
         </p>
       </div>
 
-      {/* BANNER DE REAGENDAMENTO RÁPIDO */}
+      {/* REAGENDAMENTO RÁPIDO */}
       {lastCompletedBooking && (
         <QuickRebookingBanner lastBooking={lastCompletedBooking} />
       )}
@@ -79,22 +84,21 @@ const [barbershopsRes, bookingsRes, lastBookingRes] = await Promise.all([
       </div>
 
       {/* AGENDAMENTOS */}
-      <div className="mt-6">
-        {confirmedBookings.length > 0 && (
-          <>
-            <h2 className="pl-5 text-xs mb-3 uppercase text-gray-400 font-bold">
-              Agendamentos
-            </h2>
-            <div className="px-5 flex gap-3 overflow-x-auto">
-              {confirmedBookings.map((booking: any) => (
-                <BookingItem key={booking.id} booking={booking} />
-              ))}
-            </div>
-          </>
-        )}
-      </div>
+      {confirmedBookings.length > 0 && (
+        <div className="mt-6">
+          <h2 className="pl-5 text-xs mb-3 uppercase text-gray-400 font-bold">
+            Agendamentos
+          </h2>
 
-      {/* UNIDADES / BARBERSHOPS */}
+          <div className="px-5 flex gap-3 overflow-x-auto">
+            {confirmedBookings.map((booking: any) => (
+              <BookingItem key={booking.id} booking={booking} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* BARBEARIAS */}
       <div className="mt-6 mb-[4.5rem]">
         <h2 className="px-5 text-xs mb-3 uppercase text-gray-400 font-bold">
           Unidades
