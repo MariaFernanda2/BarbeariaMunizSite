@@ -1,4 +1,4 @@
-import NextAuth, { AuthOptions } from "next-auth";
+import { AuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 
 export const authOptions: AuthOptions = {
@@ -10,25 +10,17 @@ export const authOptions: AuthOptions = {
   ],
   callbacks: {
     async jwt({ token, user }) {
-      // user existe somente no primeiro login, adiciona id no token
-      if (user) {
-        token.id = user.id;
-      }
+      if (user) token.id = user.id; // adiciona id no token
       return token;
     },
     async session({ session, token }) {
-      // adiciona id na sessão para acesso no client
       if (session.user && token.id) {
-        session.user.id = token.id as string;
+        session.user.id = token.id as string; // adiciona id na sessão
       }
       return session;
     },
   },
-  // Opcional: defina página customizada de login
   pages: {
-    signIn: "/login", // coloque a url da sua página de login
+    signIn: "/login", // página customizada
   },
 };
-
-const handler = NextAuth(authOptions);
-export { handler as GET, handler as POST };
