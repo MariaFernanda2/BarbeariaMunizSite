@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/app/lib/repositories/prisma";
 import { startOfDay, endOfDay } from "date-fns";

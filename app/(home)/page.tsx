@@ -14,25 +14,25 @@ export default async function Home() {
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id;
 
-  const baseUrl =
-    process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-
   // Faz as requisições em paralelo
-  const [barbershopsRes, bookingsRes, lastBookingRes] = await Promise.all([
-    fetch(`${baseUrl}/api/v1/barbershops?page=1&limit=10`, {
-      cache: "no-store",
-    }),
-    userId
-      ? fetch(`${baseUrl}/api/v1/bookings?userId=${userId}`, {
-          cache: "no-store",
-        })
-      : Promise.resolve(null),
-    userId
-      ? fetch(`${baseUrl}/api/v1/bookings/last-completed?userId=${userId}`, {
-          cache: "no-store",
-        })
-      : Promise.resolve(null),
-  ]);
+const [barbershopsRes, bookingsRes, lastBookingRes] = await Promise.all([
+  fetch(`${process.env.NEXTAUTH_URL ?? ""}/api/v1/barbershops?page=1&limit=10`, {
+    cache: "no-store",
+  }),
+  userId
+    ? fetch(
+        `${process.env.NEXTAUTH_URL ?? ""}/api/v1/bookings?userId=${userId}`,
+        { cache: "no-store" }
+      )
+    : Promise.resolve(null),
+  userId
+    ? fetch(
+        `${process.env.NEXTAUTH_URL ?? ""}/api/v1/bookings/last-completed?userId=${userId}`,
+        { cache: "no-store" }
+      )
+    : Promise.resolve(null),
+]);
+
 
   // Converte para JSON de forma segura
   const barbershopsData = await barbershopsRes.json().catch(() => ({
