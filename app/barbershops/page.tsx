@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import BarbershopItem from "../(home)/_components/barbershop-item";
 import Header from "../_components/header";
-import { db } from "../_lib/prisma";
+import { db } from "../lib/repositories/prisma";
 import Search from "../(home)/_components/search";
 import { Barbershop } from "@prisma/client";
 
