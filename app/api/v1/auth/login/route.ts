@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateToken } from "@/app/lib/auth/jwt";
 
-export async function GET() {
-  return NextResponse.json({ status: "login route exists" });
-}
-
 export async function POST(request: NextRequest) {
   const { email } = await request.json();
 
