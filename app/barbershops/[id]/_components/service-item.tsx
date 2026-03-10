@@ -210,20 +210,40 @@ const handleBookingSubmit = async () => {
           </SheetHeader>
 
           <div className="flex-1 overflow-y-auto">
-            <div className="py-6 px-5 border-b border-secondary">
-              <Select value={barberId} onValueChange={setBarberId}>
-                <SelectTrigger className="w-full mt-2">
-                  <SelectValue placeholder="Escolha um barbeiro" />
-                </SelectTrigger>
-                <SelectContent>
-                  {barbershop.barbers?.map((barber) => (
-                    <SelectItem key={barber.id} value={barber.id}>
-                      {barber.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+<div className="py-6 px-5 border-b border-secondary">
+  <h3 className="text-sm font-semibold mb-4">
+    Escolha seu barbeiro
+  </h3>
+
+  <div className="grid grid-cols-3 gap-4">
+    {barbershop.barbers?.map((barber) => (
+      <button
+        key={barber.id}
+        type="button"
+        onClick={() => setBarberId(barber.id)}
+        className={`flex flex-col items-center p-3 rounded-xl border transition-all
+        ${
+          barberId === barber.id
+            ? "border-primary bg-primary/10"
+            : "border-gray-200 hover:border-gray-400"
+        }`}
+      >
+        <div className="relative w-16 h-16">
+          <Image
+            src={barber.imageUrl}
+            alt={barber.name}
+            fill
+            className="rounded-full object-cover"
+          />
+        </div>
+
+        <span className="text-xs mt-2 text-center font-medium">
+          {barber.name}
+        </span>
+      </button>
+    ))}
+  </div>
+</div>
 
             <div className="py-6">
               <Calendar
