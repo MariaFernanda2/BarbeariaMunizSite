@@ -11,7 +11,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Ideal: validar no banco
   const token = generateToken({ email });
 
   return NextResponse.json({ token });

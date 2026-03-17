@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { verifyToken } from "./jwt";
 
 export function authenticate(request: NextRequest) {
+  
   const authHeader = request.headers.get("authorization");
 
   if (!authHeader?.startsWith("Bearer ")) {
