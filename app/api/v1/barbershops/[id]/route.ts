@@ -14,9 +14,6 @@ export async function GET(
   req: NextRequest,
   { params }: Params
 ) {
-  try {
-    // 🔐 valida token
-    authenticate(req);
 
     const service = new BarbershopService(
       new BarbershopRepository()
@@ -29,10 +26,4 @@ export async function GET(
       data: barbershop,
     });
 
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, message: "Unauthorized" },
-      { status: 401 }
-    );
-  }
 }

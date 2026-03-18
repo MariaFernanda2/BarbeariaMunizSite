@@ -6,8 +6,6 @@ import { authenticate } from "@/app/lib/auth/middleware";
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
-  try {
-    authenticate(req);
 
     const { searchParams } = new URL(req.url);
     const page = Number(searchParams.get("page") || 1);
@@ -21,10 +19,6 @@ export async function GET(req: NextRequest) {
       success: true,
       ...result,
     });
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, message: "Unauthorized" },
-      { status: 401 }
-    );
-  }
+  
+  
 }
