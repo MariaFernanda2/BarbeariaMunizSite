@@ -4,7 +4,11 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { db } from "@/app/lib/repositories/prisma";
 
 export const authOptions: AuthOptions = {
-  adapter: PrismaAdapter(db), // 🔥 ESSENCIAL
+  adapter: PrismaAdapter(db),
+
+  session: {
+    strategy: "jwt",
+  },
 
   providers: [
     GoogleProvider({
@@ -13,21 +17,21 @@ export const authOptions: AuthOptions = {
     }),
   ],
 
-callbacks: {
-  async jwt({ token, user }) {
-    if (user) {
-      token.id = user.id;
-    }
-    return token;
-  },
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.sub = user.id;
+      }
+      return token;
+    },
 
-  async session({ session, token }) {
-    if (session.user && token?.sub) {
-      session.user.id = token.sub; // 🔥 usar sub
-    }
-    return session;
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.id = token.sub as string;
+      }
+      return session;
+    },
   },
-},
 
   pages: {
     signIn: "/login",
