@@ -1,49 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
-import { BarbershopService } from "@/app/lib/services/barbershop.service";
+import { authenticate } from "@/app/lib/auth/middleware";
 import { BarbershopRepository } from "@/app/lib/repositories/barbershop.repository";
+import { BarbershopService } from "@/app/lib/services/barbershop.service";
 import { AppError } from "@/app/lib/errors/app-error";
 
+interface Params {
+  params: {
+    id: string;
+  };
+}
+
 export async function GET(
-  request: NextRequest,
-  context: { params: { id: string } }
+  req: NextRequest,
+  { params }: Params
 ) {
-  try {
-    const { id } = context.params;
 
-    // 1️⃣ Cria a instância do repositório
-    const repository = new BarbershopRepository();
-
-    // 2️⃣ Passa o repositório para o serviço
-    const service = new BarbershopService(repository);
-
-    // 3️⃣ Busca a barbearia
-    const barbershop = await service.findById(id);
-
-    return NextResponse.json(
-      {
-        success: true,
-        data: barbershop,
-      },
-      { status: 200 }
+    const service = new BarbershopService(
+      new BarbershopRepository()
     );
-  } catch (error) {
-    if (error instanceof AppError) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: error.message,
-        },
-        { status: error.statusCode }
-      );
-    }
 
-    console.error(error);
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Erro interno do servidor.",
-      },
-      { status: 500 }
-    );
-  }
+    const barbershop = await service.findById(params.id);
+
+    return NextResponse.json({
+      success: true,
+      data: barbershop,
+    });
+
 }
