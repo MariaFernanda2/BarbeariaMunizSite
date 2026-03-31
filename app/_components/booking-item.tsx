@@ -6,7 +6,15 @@ import { Badge } from "./ui/badge";
 import { Card, CardContent } from "./ui/card";
 import { format, isFuture } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Sheet, SheetClose, SheetContent, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "./ui/sheet";
 import Image from "next/image";
 import { Button } from "./ui/button";
 import { toast } from "sonner";
@@ -30,6 +38,7 @@ interface BookingItemProps {
     include: {
       service: true;
       barbershop: true;
+      barber: true; // ✅ ADICIONADO
     };
   }>;
 }
@@ -39,25 +48,25 @@ const BookingItem = ({ booking }: BookingItemProps) => {
 
   const isBookingConfirmed = isFuture(booking.date);
 
-const handleCancelClick = async () => {
-  setIsDeleteLoading(true);
+  const handleCancelClick = async () => {
+    setIsDeleteLoading(true);
 
-  try {
-    const response = await fetch(`/api/v1/bookings/${booking.id}`, {
-      method: "DELETE",
-    });
+    try {
+      const response = await fetch(`/api/v1/bookings/${booking.id}`, {
+        method: "DELETE",
+      });
 
-    if (!response.ok) {
-      throw new Error();
+      if (!response.ok) {
+        throw new Error();
+      }
+
+      toast.success("Reserva cancelada com sucesso!");
+    } catch (error) {
+      toast.error("Erro ao cancelar reserva.");
+    } finally {
+      setIsDeleteLoading(false);
     }
-
-    toast.success("Reserva cancelada com sucesso!");
-  } catch (error) {
-    toast.error("Erro ao cancelar reserva.");
-  } finally {
-    setIsDeleteLoading(false);
-  }
-};
+  };
 
   return (
     <Sheet>
@@ -65,22 +74,34 @@ const handleCancelClick = async () => {
         <Card className="min-w-full">
           <CardContent className="py-0 flex px-0">
             <div className="flex flex-col gap-2 py-5 flex-[3] pl-5">
-              <Badge variant={isBookingConfirmed ? "default" : "secondary"} className="w-fit">
+              <Badge
+                variant={isBookingConfirmed ? "default" : "secondary"}
+                className="w-fit"
+              >
                 {isBookingConfirmed ? "Confirmado" : "Finalizado"}
               </Badge>
+
               <h2 className="font-bold">{booking.service.name}</h2>
 
+              {/* 🔥 BARBEIRO AQUI */}
+              <p className="text-sm text-gray-400 flex items-center gap-1">
+                👤 {booking.barber.name}
+              </p>
+
+              {/* BARBEARIA */}
               <div className="flex items-center gap-2">
                 <Avatar className="h-6 w-6">
                   <AvatarImage src={booking.barbershop.imageUrl} />
-
-                  <AvatarFallback>A</AvatarFallback>
+                  <AvatarFallback>
+                    {booking.barbershop.name.charAt(0)}
+                  </AvatarFallback>
                 </Avatar>
 
                 <h3 className="text-sm">{booking.barbershop.name}</h3>
               </div>
             </div>
 
+            {/* DATA */}
             <div className="flex flex-col items-center justify-center flex-1 border-l border-solid border-secondary">
               <p className="text-sm capitalize">
                 {format(booking.date, "MMMM", {
@@ -88,7 +109,7 @@ const handleCancelClick = async () => {
                 })}
               </p>
               <p className="text-2xl">{format(booking.date, "dd")}</p>
-              <p className="text-sm">{format(booking.date, "hh:mm")}</p>
+              <p className="text-sm">{format(booking.date, "HH:mm")}</p>
             </div>
           </CardContent>
         </Card>
@@ -101,27 +122,46 @@ const handleCancelClick = async () => {
 
         <div className="px-5">
           <div className="relative h-[180px] w-full mt-6">
-            <Image src="/barbershop-map.png" fill alt={booking.barbershop.name} />
+            <Image
+              src="/barbershop-map.png"
+              fill
+              alt={booking.barbershop.name}
+            />
 
             <div className="w-full absolute bottom-4 left-0 px-5">
               <Card>
                 <CardContent className="p-3 flex gap-2">
                   <Avatar>
                     <AvatarImage src={booking.barbershop.imageUrl} />
+                    <AvatarFallback>
+                      {booking.barbershop.name.charAt(0)}
+                    </AvatarFallback>
                   </Avatar>
 
                   <div>
-                    <h2 className="font-bold">{booking.barbershop.name}</h2>
-                    <h3 className="text-xs overflow-hidden text-nowrap text-ellipsis">{booking.barbershop.address}</h3>
+                    <h2 className="font-bold">
+                      {booking.barbershop.name}
+                    </h2>
+                    <h3 className="text-xs overflow-hidden text-nowrap text-ellipsis">
+                      {booking.barbershop.address}
+                    </h3>
                   </div>
                 </CardContent>
               </Card>
             </div>
           </div>
 
-          <Badge variant={isBookingConfirmed ? "default" : "secondary"} className="w-fit my-3">
+          <Badge
+            variant={isBookingConfirmed ? "default" : "secondary"}
+            className="w-fit my-3"
+          >
             {isBookingConfirmed ? "Confirmado" : "Finalizado"}
           </Badge>
+
+          {/* 🔥 BARBEIRO NO DETALHE */}
+          <p className="text-sm text-gray-400 mb-3">
+            👤 Barbeiro: {booking.barber.name}
+          </p>
 
           <BookingInfo booking={booking} />
 
@@ -134,21 +174,38 @@ const handleCancelClick = async () => {
 
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button disabled={!isBookingConfirmed || isDeleteLoading} className="w-full" variant="destructive">
+                <Button
+                  disabled={!isBookingConfirmed || isDeleteLoading}
+                  className="w-full"
+                  variant="destructive"
+                >
                   Cancelar Reserva
                 </Button>
               </AlertDialogTrigger>
+
               <AlertDialogContent className="w-[90%]">
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Deseja mesmo cancelar essa reserva?</AlertDialogTitle>
+                  <AlertDialogTitle>
+                    Deseja mesmo cancelar essa reserva?
+                  </AlertDialogTitle>
                   <AlertDialogDescription>
                     Uma vez cancelada, não será possível reverter essa ação.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
+
                 <AlertDialogFooter className="flex-row gap-3">
-                  <AlertDialogCancel className="w-full mt-0">Voltar</AlertDialogCancel>
-                  <AlertDialogAction disabled={isDeleteLoading} className="w-full" onClick={handleCancelClick}>
-                    {isDeleteLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  <AlertDialogCancel className="w-full mt-0">
+                    Voltar
+                  </AlertDialogCancel>
+
+                  <AlertDialogAction
+                    disabled={isDeleteLoading}
+                    className="w-full"
+                    onClick={handleCancelClick}
+                  >
+                    {isDeleteLoading && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
                     Confirmar
                   </AlertDialogAction>
                 </AlertDialogFooter>

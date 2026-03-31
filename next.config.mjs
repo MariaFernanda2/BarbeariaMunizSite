@@ -10,6 +10,10 @@ const nextConfig = {
         protocol: "https",
         hostname: "cl1ro7kgga.ufs.sh",
       },
+      {
+        protocol: "https",
+        hostname: "via.placeholder.com", 
+      },
     ],
   },
 };
