@@ -6,8 +6,9 @@ import { BookingResponseDTO } from "../dtos/booking-response.dto";
 export class BookingService {
   private bookingRepository: BookingRepository;
 
-  constructor() {
-    this.bookingRepository = new BookingRepository();
+  // Ajustado para aceitar o repositório no constructor (Injeção de Dependência)
+  constructor(bookingRepository?: BookingRepository) {
+    this.bookingRepository = bookingRepository || new BookingRepository();
   }
 
   async create(data: CreateBookingDTO): Promise<BookingResponseDTO> {
@@ -32,14 +33,21 @@ export class BookingService {
     return this.mapToResponse(booking);
   }
 
-  async cancel(id: string) {
+  // Nome alterado para cancelBooking e adicionado userId para segurança
+  async cancelBooking(id: string, userId: string) {
     const booking = await this.bookingRepository.findById(id);
 
     if (!booking) {
       throw new AppError("Reserva não encontrada.", 404);
     }
 
-    if (booking.date <= new Date()) {
+    // 🛡️ Validação de segurança: Impede que um usuário cancele o agendamento de outro
+    // Nota: O seu repositório precisa retornar o userId no findById
+    if (booking.userId !== userId) {
+      throw new AppError("Você não tem permissão para cancelar esta reserva.", 401);
+    }
+
+    if (new Date(booking.date) <= new Date()) {
       throw new AppError("Não é possível cancelar reserva finalizada.", 400);
     }
 

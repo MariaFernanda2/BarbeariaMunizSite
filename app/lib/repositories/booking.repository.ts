@@ -33,7 +33,11 @@ export class BookingRepository {
   async findById(id: string) {
     return db.booking.findUnique({
       where: { id },
-      include: { service: true, barbershop: true },
+      // Adicionado userId explicitamente para validação na Service
+      include: { 
+        service: true, 
+        barbershop: true 
+      },
     });
   }
 
