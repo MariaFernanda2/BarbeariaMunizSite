@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { BarbershopRepository } from "@/app/lib/repositories/barbershop.repository";
-import { BarbershopService } from "@/app/lib/services/barbershop.service";
-import { AppError } from "@/app/lib/errors/app-error";
+import { db } from "@/app/lib/repositories/prisma";
 import { authenticate } from "@/app/lib/auth/middleware";
+import { AppError } from "@/app/lib/errors/app-error";
 
 interface Params {
   params: {
@@ -10,27 +9,39 @@ interface Params {
   };
 }
 
-export async function GET(
+export async function DELETE(
   request: NextRequest,
   { params }: Params
 ) {
   try {
-    // 🔐 Autenticação via Bearer Token
-    const user = authenticate(request);
+    // 🔐 Retorna string (userId)
+    const userId = authenticate(request);
 
-    const service = new BarbershopService(
-      new BarbershopRepository()
-    );
+    const booking = await db.booking.findUnique({
+      where: { id: params.id },
+    });
 
-    const barbershop = await service.findById(params.id);
+    if (!booking) {
+      throw new AppError("Agendamento não encontrado", 404);
+    }
+
+    // 🔒 Segurança: só o dono pode cancelar
+    if (booking.userId !== userId) {
+      throw new AppError("Não autorizado", 403);
+    }
+
+    await db.booking.delete({
+      where: { id: params.id },
+    });
 
     return NextResponse.json({
       success: true,
-      data: barbershop,
-      requestedBy: user, // opcional (para debug)
+      message: "Agendamento cancelado com sucesso",
     });
 
   } catch (error) {
+    console.error(error);
+
     if (error instanceof AppError) {
       return NextResponse.json(
         { success: false, message: error.message },
