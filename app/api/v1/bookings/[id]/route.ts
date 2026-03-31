@@ -4,14 +4,6 @@ import { BarbershopService } from "@/app/lib/services/barbershop.service";
 import { BookingRepository } from "@/app/lib/repositories/booking.repository";
 import { BookingService } from "@/app/lib/services/booking.service";
 import { AppError } from "@/app/lib/errors/app-error";
-import { authenticate } from "@/app/lib/auth/middleware";
-
-// Interface para resolver o erro "Property id does not exist"
-interface AuthUser {
-  id: string;
-  name?: string;
-  email?: string;
-}
 
 interface Params {
   params: {
@@ -24,9 +16,7 @@ export async function GET(
   { params }: Params
 ) {
   try {
-    // Casting para AuthUser
-    const user = authenticate(request) as AuthUser;
-
+    // 🔓 Aberto: Não precisa mais de authenticate(request)
     const service = new BarbershopService(
       new BarbershopRepository()
     );
@@ -36,7 +26,6 @@ export async function GET(
     return NextResponse.json({
       success: true,
       data: barbershop,
-      requestedBy: user,
     });
   } catch (error) {
     return handleError(error);
@@ -48,15 +37,13 @@ export async function DELETE(
   { params }: Params
 ) {
   try {
-    // Casting para AuthUser resolve o erro de tipagem no user.id
-    const user = authenticate(request) as AuthUser;
-
+    // 🔓 Aberto: Removido authenticate e verificações de user.id
     const service = new BookingService(
       new BookingRepository()
     );
 
-    // Agora o TypeScript reconhece o 'id'
-    await service.cancelBooking(params.id, user.id);
+    // Agora passamos apenas o ID do agendamento
+    await service.cancelBooking(params.id);
 
     return NextResponse.json({
       success: true,
@@ -68,7 +55,6 @@ export async function DELETE(
   }
 }
 
-// Função auxiliar para evitar repetição de código nos catches
 function handleError(error: unknown) {
   if (error instanceof AppError) {
     return NextResponse.json(
@@ -77,13 +63,7 @@ function handleError(error: unknown) {
     );
   }
 
-  if (error instanceof Error && error.message === "Unauthorized") {
-    return NextResponse.json(
-      { success: false, message: "Token inválido ou ausente" },
-      { status: 401 }
-    );
-  }
-
+  // Erro genérico para falhas inesperadas
   return NextResponse.json(
     { success: false, message: "Erro interno do servidor" },
     { status: 500 }
