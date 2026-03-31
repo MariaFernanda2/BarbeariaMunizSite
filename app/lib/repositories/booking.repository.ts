@@ -8,15 +8,15 @@ export class BookingRepository {
 
         // Conecta usuário existente ou cria
         user: {
-          connectOrCreate: {
-            where: { id: data.userId },
-            create: {
-              id: data.userId,
-              name: data.userName || "Usuário do Google",
-              email: data.userEmail || "",
-            },
-          },
-        },
+  connectOrCreate: {
+    where: { id: data.userId },
+    create: {
+      id: data.userId,
+      name: data.userName || "Usuário do Google",
+      email: data.userEmail || "",
+    },
+  },
+},
 
         // Conecta relações obrigatórias
         barber: { connect: { id: data.barberId } },
