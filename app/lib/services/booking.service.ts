@@ -40,6 +40,11 @@ export class BookingService {
     if (!booking) {
       throw new AppError("Reserva não encontrada.", 404);
     }
+    // DEBUG: Adicione essas linhas para ver no terminal do VS Code/Vercel
+  console.log("---------------- DEBUG CANCELAMENTO ----------------");
+  console.log("ID do Usuário no Banco:", booking.userId);
+  console.log("ID do Usuário no Token:", userId);
+  console.log("----------------------------------------------------");
 
     // 🛡️ Validação de segurança: Impede que um usuário cancele o agendamento de outro
     // Nota: O seu repositório precisa retornar o userId no findById
