@@ -9,6 +9,9 @@ import BookingItem from "@/app/_components/booking-item";
 import Search from "./_components/search";
 import BarbershopItem from "./_components/barbershop-item";
 import QuickRebookingBanner from "./_components/quick-rebooking-banner";
+import Carousel from "./_components/carousel";
+import EventsSection from "./_components/events-section";
+
 
 export default async function Home() {
   const session = await getServerSession(authOptions);
@@ -20,22 +23,25 @@ export default async function Home() {
   const baseUrl = `${protocol}://${host}`;
 
   // 🔥 Requests paralelas
-  const [barbershopsRes, bookingsRes, lastBookingRes] =
+  const [barbershopsRes, bookingsRes, lastBookingRes, carouselRes] =
     await Promise.all([
       fetch(`${baseUrl}/api/v1/barbershops?page=1&limit=10`, {
         cache: "no-store",
       }),
       userId
         ? fetch(`${baseUrl}/api/v1/bookings?userId=${userId}`, {
-            cache: "no-store",
-          })
+          cache: "no-store",
+        })
         : Promise.resolve(null),
       userId
         ? fetch(
-            `${baseUrl}/api/v1/bookings/last-completed?userId=${userId}`,
-            { cache: "no-store" }
-          )
+          `${baseUrl}/api/v1/bookings/last-completed?userId=${userId}`,
+          { cache: "no-store" }
+        )
         : Promise.resolve(null),
+      fetch(`${baseUrl}/api/v1/carousel`, {
+        cache: "no-store",
+      }),
     ]);
 
   // 🔥 JSON seguro
@@ -51,13 +57,23 @@ export default async function Home() {
     data: null,
   }));
 
+  const carouselData = await carouselRes.json().catch(() => ({
+    data: [],
+  }));
+
   const recommendedBarbershops = barbershopsData?.data ?? [];
   const confirmedBookings = bookingsData?.data ?? [];
   const lastCompletedBooking = lastBookingData?.data ?? null;
+  const carouselItems = carouselData?.data ?? [];
 
   return (
     <div>
       <Header />
+
+        {/* SEARCH */}
+      <div className="px-5 mt-6">
+        <Search />
+      </div>
 
       {/* SAUDAÇÃO */}
       <div className="px-5 pt-5">
@@ -66,20 +82,29 @@ export default async function Home() {
             ? `Olá, ${session.user.name?.split(" ")[0]}!`
             : "Olá! Vamos agendar um corte hoje?"}
         </h2>
-        <p className="capitalize text-sm">
+        <p className="capitalize text-sm mb-4">
           {format(new Date(), "EEEE',' dd 'de' MMMM", { locale: ptBR })}
         </p>
       </div>
 
+      {/* CARROSSEL */}
+      {carouselItems.length > 0 && (
+        <div className="mt-6">
+          <h2 className="px-5 text-xs mb-3 uppercase text-gray-400 font-bold">
+            Confira nosso trabalho
+          </h2>
+
+          <Carousel items={carouselItems} />
+
+          <EventsSection />
+        </div>
+      )}
+
+      
       {/* REAGENDAMENTO RÁPIDO */}
       {lastCompletedBooking && (
         <QuickRebookingBanner lastBooking={lastCompletedBooking} />
       )}
-
-      {/* SEARCH */}
-      <div className="px-5 mt-6">
-        <Search />
-      </div>
 
       {/* AGENDAMENTOS */}
       {confirmedBookings.length > 0 && (
