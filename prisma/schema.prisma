@@ -146,3 +146,28 @@ model ScheduleBlock {
   barber     Barber     @relation(fields: [barberId], references: [id], onDelete: Cascade)
   barbershop Barbershop @relation(fields: [barbershopId], references: [id], onDelete: Cascade)
 }
+model BookingReview {
+  id         String   @id @default(uuid())
+  bookingId  String   @unique
+  barberId   String
+  userId     String
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  barber  Barber  @relation(fields: [barberId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+model BarberMonthlyGoal {
+  id        String   @id @default(uuid())
+  barberId  String
+  month     Int
+  year      Int
+  targetBookings Int?
+  targetRevenue  Decimal? @db.Decimal(10,2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  barber Barber @relation(fields: [barberId], references: [id], onDelete: Cascade)
+}
