@@ -17,7 +17,7 @@ const mockEvents: Event[] = [
   {
     id: 1,
     title: "Inauguração da Unidade II",
-    date: new Date(2026, 3, 10),
+    date: new Date(2026, 3, 11),
     description: "Venha conhecer nossa nova unidade!",
     image:
       "https://cl1ro7kgga.ufs.sh/f/vKcUisEYIxmgRtaCb3zLlfvcJFoSYEXi928QzG5nMm671VuO",

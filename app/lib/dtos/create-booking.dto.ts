@@ -1,7 +1,8 @@
 export interface CreateBookingDTO {
-  userId: string;
+  userId?: string;
+  clientName?: string;
   serviceId: string;
   barberId: string;
-  barbershopId: string; 
-  date: string;
+  barbershopId: string;
+  date: string | Date;
 }

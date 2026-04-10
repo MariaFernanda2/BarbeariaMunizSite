@@ -3,9 +3,15 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
   relationMode = "prisma"
+}
+
+enum Role {
+  USER
+  BARBER
+  ADMIN
 }
 
 model User {
@@ -17,6 +23,10 @@ model User {
   accounts      Account[]
   bookings      Booking[]
   sessions      Session[]
+  role          Role      @default(USER)
+
+  barber   Barber? @relation(fields: [barberId], references: [id])
+  barberId String? @unique
 }
 
 model Barbershop {
@@ -27,6 +37,7 @@ model Barbershop {
   barbers  Barber[]
   bookings Booking[]
   services Service[]
+  scheduleBlocks ScheduleBlock[]
 }
 
 model Service {
@@ -41,25 +52,40 @@ model Service {
 }
 
 model Barber {
-  id           String     @id @default(uuid())
+  id           String @id
   name         String
   imageUrl     String
   barbershopId String
-  barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
-  bookings     Booking[]
+
+  barbershop Barbershop @relation(fields: [barbershopId], references: [id])
+  bookings   Booking[]
+  scheduleBlocks ScheduleBlock[]
+
+
+  user User?
+}
+
+enum BookingStatus {
+  CONFIRMED
+  COMPLETED
+  CANCELED
 }
 
 model Booking {
-  id           String     @id @default(uuid())
+  id           String   @id @default(uuid())
   userId       String
   serviceId    String
   barberId     String
   barbershopId String
   date         DateTime
-  barber       Barber     @relation(fields: [barberId], references: [id])
-  barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
-  service      Service    @relation(fields: [serviceId], references: [id])
-  user         User       @relation(fields: [userId], references: [id])
+
+  status BookingStatus @default(CONFIRMED)
+
+  // 🔥 RELAÇÕES CORRETAS
+  barber     Barber     @relation(fields: [barberId], references: [id])
+  barbershop Barbershop @relation(fields: [barbershopId], references: [id])
+  service    Service    @relation(fields: [serviceId], references: [id])
+  user       User       @relation(fields: [userId], references: [id])
 }
 
 model Account {
@@ -94,4 +120,29 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model HaircutCarousel {
+  id            Int      @id @default(autoincrement())
+  image_url     String
+  description   String?
+  display_order Int
+  active        Boolean  @default(true)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@map("haircut_carousel")
+}
+model ScheduleBlock {
+  id           String   @id @default(uuid())
+  barberId     String
+  barbershopId String
+  startDate    DateTime
+  endDate      DateTime
+  reason       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  barber     Barber     @relation(fields: [barberId], references: [id], onDelete: Cascade)
+  barbershop Barbershop @relation(fields: [barbershopId], references: [id], onDelete: Cascade)
 }
