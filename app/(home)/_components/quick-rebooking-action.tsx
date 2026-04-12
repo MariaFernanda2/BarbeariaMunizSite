@@ -115,7 +115,9 @@ const QuickRebookingAction = ({
 
     const [hour, minutes] = selectedHour.split(":").map(Number);
 
-    return setMinutes(setHours(selectedDate, hour), minutes);
+    const date = new Date(selectedDate);
+    date.setHours(hour, minutes, 0, 0);
+    return date;
   };
 
   const handleBookingSubmit = async () => {
