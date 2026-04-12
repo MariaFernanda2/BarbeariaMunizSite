@@ -8,6 +8,67 @@ export type SessionUser = {
   barberId?: string | null;
 };
 
+export type BarbershopSummary = {
+  id: string;
+  name: string;
+  address: string;
+  imageUrl: string;
+};
+
+export type BookingServiceSummary = {
+  id: string;
+  name: string;
+  barbershopId: string;
+  price: number;
+  description: string;
+  imageUrl: string;
+};
+
+export type BookingBarberSummary = {
+  id: string;
+  name: string;
+  imageUrl: string;
+};
+
+export type BookingBarbershopSummary = {
+  id: string;
+  name: string;
+  address: string;
+  imageUrl: string;
+};
+
+export type BookingSummary = {
+  id: string;
+  date: string;
+  status: "CONFIRMED" | "COMPLETED" | "CANCELED";
+  service: BookingServiceSummary;
+  barber: BookingBarberSummary;
+  barbershop: BookingBarbershopSummary;
+};
+
+export type BookingPreview = {
+  service: {
+    id: string;
+    name: string;
+    barbershopId: string;
+    price: number | string;
+    description: string;
+    imageUrl: string;
+  };
+  barbershop: BookingBarbershopSummary;
+  date?: string | Date;
+};
+
+export type CarouselItem = {
+  id: number;
+  image_url: string;
+  description?: string | null;
+  display_order: number;
+  active: boolean;
+  created_at?: string | Date;
+  updated_at?: string | Date;
+};
+
 export type HomeData = {
   recommendedBarbershops: BarbershopSummary[];
   confirmedBookings: BookingSummary[];
@@ -49,63 +110,4 @@ export type BarberDashboardData = {
   metrics: BarberMetric[];
   actions: BarberAction[];
   performance: BarberPerformance;
-};
-
-export type BarbershopSummary = {
-  id: string;
-  name: string;
-  address: string;
-  imageUrl: string;
-};
-
-export type BookingSummary = {
-  id: string;
-  date: string | Date | undefined;
-  status: "CONFIRMED" | "COMPLETED" | "CANCELED";
-  service: {
-    id: string;
-    name: string;
-    barbershopId: string;
-    price: number;
-    description: string;
-    imageUrl: string;
-  };
-  barber: {
-    id: string;
-    name: string;
-    imageUrl: string;
-  };
-  barbershop: {
-    id: string;
-    name: string;
-    address: string;
-    imageUrl: string;
-  };
-};
-
-export type CarouselItem = {
-  id: number;
-  image_url: string;
-  description?: string | null;
-  display_order: number;
-  active: boolean;
-  created_at?: string | Date;
-  updated_at?: string | Date;
-};
-export type BookingPreview = {
-  barbershop: {
-    id: string;
-    name: string;
-    address: string;
-    imageUrl: string;
-  };
-  service: {
-    id: string;
-    name: string;
-    barbershopId: string;
-    price: number | string;
-    description: string;
-    imageUrl: string;
-  };
-  date?: string | Date;
 };

@@ -1,9 +1,11 @@
 import { getServerSession } from "next-auth";
-import Header from "../_components/header";
 import { redirect } from "next/navigation";
-import { db } from "../lib/repositories/prisma";
+
+import Header from "../_components/header";
 import BookingItem from "../_components/booking-item";
 import { authOptions } from "../lib/auth";
+import { db } from "../lib/repositories/prisma";
+import type { BookingSummary } from "@/app/types/home.types";
 
 const BookingsPage = async () => {
   const session = await getServerSession(authOptions);
@@ -14,7 +16,7 @@ const BookingsPage = async () => {
 
   const userId = (session.user as any).id;
 
-  const [confirmedBookings, finishedBookings] = await Promise.all([
+  const [confirmedBookingsRaw, finishedBookingsRaw] = await Promise.all([
     db.booking.findMany({
       where: {
         userId,
@@ -25,7 +27,7 @@ const BookingsPage = async () => {
       include: {
         service: true,
         barbershop: true,
-        barber: true, // ✅ ADICIONADO
+        barber: true,
       },
       orderBy: {
         date: "asc",
@@ -42,7 +44,7 @@ const BookingsPage = async () => {
       include: {
         service: true,
         barbershop: true,
-        barber: true, // ✅ ADICIONADO
+        barber: true,
       },
       orderBy: {
         date: "desc",
@@ -50,17 +52,44 @@ const BookingsPage = async () => {
     }),
   ]);
 
+  const normalizeBooking = (booking: typeof confirmedBookingsRaw[number]): BookingSummary => ({
+    id: booking.id,
+    date: booking.date.toISOString(),
+    status: booking.status,
+    service: {
+      id: booking.service.id,
+      name: booking.service.name,
+      barbershopId: booking.service.barbershopId,
+      price: Number(booking.service.price),
+      description: booking.service.description,
+      imageUrl: booking.service.imageUrl,
+    },
+    barber: {
+      id: booking.barber.id,
+      name: booking.barber.name,
+      imageUrl: booking.barber.imageUrl,
+    },
+    barbershop: {
+      id: booking.barbershop.id,
+      name: booking.barbershop.name,
+      imageUrl: booking.barbershop.imageUrl,
+      address: booking.barbershop.address,
+    },
+  });
+
+  const confirmedBookings = confirmedBookingsRaw.map(normalizeBooking);
+  const finishedBookings = finishedBookingsRaw.map(normalizeBooking);
+
   return (
     <>
       <Header />
 
       <div className="px-5 py-6">
-        <h1 className="text-xl font-bold mb-6">Agendamentos</h1>
+        <h1 className="mb-6 text-xl font-bold">Agendamentos</h1>
 
-        {/* CONFIRMADOS */}
         {confirmedBookings.length > 0 && (
           <>
-            <h2 className="text-gray-400 uppercase font-bold text-sm mb-3">
+            <h2 className="mb-3 text-sm font-bold uppercase text-gray-400">
               Confirmados
             </h2>
 
@@ -72,10 +101,9 @@ const BookingsPage = async () => {
           </>
         )}
 
-        {/* FINALIZADOS */}
         {finishedBookings.length > 0 && (
           <>
-            <h2 className="text-gray-400 uppercase font-bold text-sm mt-6 mb-3">
+            <h2 className="mb-3 mt-6 text-sm font-bold uppercase text-gray-400">
               Finalizados
             </h2>
 
