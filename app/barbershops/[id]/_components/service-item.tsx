@@ -85,71 +85,71 @@ const ServiceItem = ({ service, barbershop }: ServiceItemProps) => {
     setSheetIsOpen(true);
   };
 
-const handleBookingSubmit = async () => {
-  if (!hour || !date || !barberId) {
-    console.log("Dados incompletos", { hour, date, barberId });
-    return;
-  }
+  const handleBookingSubmit = async () => {
+    if (!hour || !date || !barberId) {
+      console.log("Dados incompletos", { hour, date, barberId });
+      return;
+    }
 
-  if (!session?.user?.id) {
-    console.log("Usuário sem ID na sessão", session);
-    toast.error("Você precisa estar logado para reservar");
-    return;
-  }
+    if (!session?.user?.id) {
+      console.log("Usuário sem ID na sessão", session);
+      toast.error("Você precisa estar logado para reservar");
+      return;
+    }
 
-  setSubmitIsLoading(true);
+    setSubmitIsLoading(true);
 
-  try {
-    const dateHour = Number(hour.split(":")[0]);
-    const dateMinutes = Number(hour.split(":")[1]);
-    const bookingDate = setMinutes(setHours(date, dateHour), dateMinutes);
+    try {
+      const dateHour = Number(hour.split(":")[0]);
+      const dateMinutes = Number(hour.split(":")[1]);
+      const bookingDate = setMinutes(setHours(date, dateHour), dateMinutes);
 
-    console.log("ENVIANDO BOOKING...", {
-      userId: session.user.id,
-      serviceId: service.id,
-      barberId,
-      date: bookingDate.toISOString(),
-    });
-
-    const response = await fetch("/api/v1/bookings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+      console.log("ENVIANDO BOOKING...", {
         userId: session.user.id,
         serviceId: service.id,
         barberId,
-        barbershopId: barbershop.id,
         date: bookingDate.toISOString(),
-      }),
-    });
+      });
 
-    const result = await response.json();
-    console.log("RESPOSTA BOOKING:", result);
+      const response = await fetch("/api/v1/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: session.user.id,
+          serviceId: service.id,
+          barberId,
+          barbershopId: barbershop.id,
+          date: bookingDate.toISOString(),
+        }),
+      });
 
-    if (!response.ok) {
-      throw new Error(result.message || "Erro ao criar reserva");
+      const result = await response.json();
+      console.log("RESPOSTA BOOKING:", result);
+
+      if (!response.ok) {
+        throw new Error(result.message || "Erro ao criar reserva");
+      }
+
+      setSheetIsOpen(false);
+      setHour(undefined);
+      setDate(undefined);
+      setBarberId(undefined);
+
+      toast("Reserva realizada com sucesso!", {
+        description: format(
+          bookingDate,
+          "'Para' dd 'de' MMMM 'às' HH':'mm'.'",
+          { locale: ptBR }
+        ),
+        action: { label: "Visualizar", onClick: () => router.push("/bookings") },
+      });
+    } catch (error: any) {
+      console.error("HANDLE BOOKING ERROR:", error);
+      toast.error(error.message || "Erro ao realizar reserva");
+    } finally {
+      setSubmitIsLoading(false);
     }
-
-    setSheetIsOpen(false);
-    setHour(undefined);
-    setDate(undefined);
-    setBarberId(undefined);
-
-    toast("Reserva realizada com sucesso!", {
-      description: format(
-        bookingDate,
-        "'Para' dd 'de' MMMM 'às' HH':'mm'.'",
-        { locale: ptBR }
-      ),
-      action: { label: "Visualizar", onClick: () => router.push("/bookings") },
-    });
-  } catch (error: any) {
-    console.error("HANDLE BOOKING ERROR:", error);
-    toast.error(error.message || "Erro ao realizar reserva");
-  } finally {
-    setSubmitIsLoading(false);
-  }
-};
+  };
 
   const timeList = useMemo(() => {
     if (!date) return [];
@@ -210,40 +210,39 @@ const handleBookingSubmit = async () => {
           </SheetHeader>
 
           <div className="flex-1 overflow-y-auto">
-<div className="py-6 px-5 border-b border-secondary">
-  <h3 className="text-sm font-semibold mb-4">
-    Escolha seu barbeiro
-  </h3>
+            <div className="py-6 px-5 border-b border-secondary">
+              <h3 className="text-sm font-semibold mb-4">
+                Escolha seu barbeiro
+              </h3>
 
-  <div className="grid grid-cols-3 gap-4">
-    {barbershop.barbers?.map((barber) => (
-      <button
-        key={barber.id}
-        type="button"
-        onClick={() => setBarberId(barber.id)}
-        className={`flex flex-col items-center p-3 rounded-xl border transition-all
-        ${
-          barberId === barber.id
-            ? "border-primary bg-primary/10"
-            : "border-gray-200 hover:border-gray-400"
-        }`}
-      >
-        <div className="relative w-16 h-16">
-          <Image
-            src={barber.imageUrl}
-            alt={barber.name}
-            fill
-            className="rounded-full object-cover"
-          />
-        </div>
+              <div className="grid grid-cols-3 gap-4">
+                {barbershop.barbers?.map((barber) => (
+                  <button
+                    key={barber.id}
+                    type="button"
+                    onClick={() => setBarberId(barber.id)}
+                    className={`flex flex-col items-center p-3 rounded-xl border transition-all
+        ${barberId === barber.id
+                        ? "border-primary bg-primary/10"
+                        : "border-gray-200 hover:border-gray-400"
+                      }`}
+                  >
+                    <div className="relative w-16 h-16">
+                      <Image
+                        src={barber.imageUrl}
+                        alt={barber.name}
+                        fill
+                        className="rounded-full object-cover"
+                      />
+                    </div>
 
-        <span className="text-xs mt-2 text-center font-medium">
-          {barber.name}
-        </span>
-      </button>
-    ))}
-  </div>
-</div>
+                    <span className="text-xs mt-2 text-center font-medium">
+                      {barber.name}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <div className="py-6">
               <Calendar
@@ -274,13 +273,16 @@ const handleBookingSubmit = async () => {
               <BookingInfo
                 booking={{
                   barbershop,
-                  service,
+                  service: {
+                    ...service,
+                    price: Number(service.price),
+                  },
                   date:
                     date && hour
                       ? setMinutes(
-                          setHours(date, Number(hour.split(":")[0])),
-                          Number(hour.split(":")[1])
-                        )
+                        setHours(date, Number(hour.split(":")[0])),
+                        Number(hour.split(":")[1])
+                      )
                       : undefined,
                 }}
               />

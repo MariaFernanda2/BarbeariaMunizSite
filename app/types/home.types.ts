@@ -60,7 +60,7 @@ export type BarbershopSummary = {
 
 export type BookingSummary = {
   id: string;
-  date: string;
+  date: string | Date | undefined;
   status: "CONFIRMED" | "COMPLETED" | "CANCELED";
   service: {
     id: string;
@@ -91,4 +91,21 @@ export type CarouselItem = {
   active: boolean;
   created_at?: string | Date;
   updated_at?: string | Date;
+};
+export type BookingPreview = {
+  barbershop: {
+    id: string;
+    name: string;
+    address: string;
+    imageUrl: string;
+  };
+  service: {
+    id: string;
+    name: string;
+    barbershopId: string;
+    price: number | string;
+    description: string;
+    imageUrl: string;
+  };
+  date?: string | Date;
 };
