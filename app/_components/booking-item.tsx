@@ -1,25 +1,16 @@
 "use client";
 
-import { Prisma } from "@prisma/client";
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import { Badge } from "./ui/badge";
-import { Card, CardContent } from "./ui/card";
+import { useState } from "react";
+import Image from "next/image";
 import { format, isFuture } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "./ui/sheet";
-import Image from "next/image";
-import { Button } from "./ui/button";
-import { toast } from "sonner";
-import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
+
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import { Card, CardContent } from "./ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,25 +22,35 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "./ui/alert-dialog";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "./ui/sheet";
+
 import BookingInfo from "./booking-info";
 
+import type { BookingSummary } from "@/app/types/home.types";
+
 interface BookingItemProps {
-  booking: Prisma.BookingGetPayload<{
-    include: {
-      service: true;
-      barbershop: true;
-      barber: true; // ✅ ADICIONADO
-    };
-  }>;
+  booking: BookingSummary;
 }
 
 const BookingItem = ({ booking }: BookingItemProps) => {
-  const [isDeleteLoading, setIsDeleteLoading] = useState(false);
+  const [isCancelLoading, setIsCancelLoading] = useState(false);
 
-  const isBookingConfirmed = isFuture(booking.date);
+  const bookingDate = new Date(booking.date);
+  const isBookingConfirmed = isFuture(bookingDate);
+
+  const statusLabel = isBookingConfirmed ? "Confirmado" : "Finalizado";
+  const statusVariant = isBookingConfirmed ? "default" : "secondary";
 
   const handleCancelClick = async () => {
-    setIsDeleteLoading(true);
+    setIsCancelLoading(true);
 
     try {
       const response = await fetch(`/api/v1/bookings/${booking.id}`, {
@@ -57,14 +58,15 @@ const BookingItem = ({ booking }: BookingItemProps) => {
       });
 
       if (!response.ok) {
-        throw new Error();
+        throw new Error("Erro ao cancelar reserva.");
       }
 
       toast.success("Reserva cancelada com sucesso!");
     } catch (error) {
+      console.error(error);
       toast.error("Erro ao cancelar reserva.");
     } finally {
-      setIsDeleteLoading(false);
+      setIsCancelLoading(false);
     }
   };
 
@@ -72,23 +74,18 @@ const BookingItem = ({ booking }: BookingItemProps) => {
     <Sheet>
       <SheetTrigger asChild>
         <Card className="min-w-full">
-          <CardContent className="py-0 flex px-0">
-            <div className="flex flex-col gap-2 py-5 flex-[3] pl-5">
-              <Badge
-                variant={isBookingConfirmed ? "default" : "secondary"}
-                className="w-fit"
-              >
-                {isBookingConfirmed ? "Confirmado" : "Finalizado"}
+          <CardContent className="flex px-0 py-0">
+            <div className="flex flex-[3] flex-col gap-2 py-5 pl-5">
+              <Badge variant={statusVariant} className="w-fit">
+                {statusLabel}
               </Badge>
 
               <h2 className="font-bold">{booking.service.name}</h2>
 
-              {/* 🔥 BARBEIRO AQUI */}
-              <p className="text-sm text-gray-400 flex items-center gap-1">
+              <p className="flex items-center gap-1 text-sm text-gray-400">
                 👤 {booking.barber.name}
               </p>
 
-              {/* BARBEARIA */}
               <div className="flex items-center gap-2">
                 <Avatar className="h-6 w-6">
                   <AvatarImage src={booking.barbershop.imageUrl} />
@@ -101,36 +98,33 @@ const BookingItem = ({ booking }: BookingItemProps) => {
               </div>
             </div>
 
-            {/* DATA */}
-            <div className="flex flex-col items-center justify-center flex-1 border-l border-solid border-secondary">
+            <div className="flex flex-1 flex-col items-center justify-center border-l border-solid border-secondary">
               <p className="text-sm capitalize">
-                {format(booking.date, "MMMM", {
-                  locale: ptBR,
-                })}
+                {format(bookingDate, "MMMM", { locale: ptBR })}
               </p>
-              <p className="text-2xl">{format(booking.date, "dd")}</p>
-              <p className="text-sm">{format(booking.date, "HH:mm")}</p>
+              <p className="text-2xl">{format(bookingDate, "dd")}</p>
+              <p className="text-sm">{format(bookingDate, "HH:mm")}</p>
             </div>
           </CardContent>
         </Card>
       </SheetTrigger>
 
       <SheetContent className="px-0">
-        <SheetHeader className="px-5 text-left pb-6 border-b border-solid border-secondary">
+        <SheetHeader className="border-b border-solid border-secondary px-5 pb-6 text-left">
           <SheetTitle>Informações da Reserva</SheetTitle>
         </SheetHeader>
 
         <div className="px-5">
-          <div className="relative h-[180px] w-full mt-6">
+          <div className="relative mt-6 h-[180px] w-full">
             <Image
               src="/barbershop-map.png"
               fill
               alt={booking.barbershop.name}
             />
 
-            <div className="w-full absolute bottom-4 left-0 px-5">
+            <div className="absolute bottom-4 left-0 w-full px-5">
               <Card>
-                <CardContent className="p-3 flex gap-2">
+                <CardContent className="flex gap-2 p-3">
                   <Avatar>
                     <AvatarImage src={booking.barbershop.imageUrl} />
                     <AvatarFallback>
@@ -139,10 +133,8 @@ const BookingItem = ({ booking }: BookingItemProps) => {
                   </Avatar>
 
                   <div>
-                    <h2 className="font-bold">
-                      {booking.barbershop.name}
-                    </h2>
-                    <h3 className="text-xs overflow-hidden text-nowrap text-ellipsis">
+                    <h2 className="font-bold">{booking.barbershop.name}</h2>
+                    <h3 className="overflow-hidden text-ellipsis text-nowrap text-xs">
                       {booking.barbershop.address}
                     </h3>
                   </div>
@@ -151,21 +143,17 @@ const BookingItem = ({ booking }: BookingItemProps) => {
             </div>
           </div>
 
-          <Badge
-            variant={isBookingConfirmed ? "default" : "secondary"}
-            className="w-fit my-3"
-          >
-            {isBookingConfirmed ? "Confirmado" : "Finalizado"}
+          <Badge variant={statusVariant} className="my-3 w-fit">
+            {statusLabel}
           </Badge>
 
-          {/* 🔥 BARBEIRO NO DETALHE */}
-          <p className="text-sm text-gray-400 mb-3">
+          <p className="mb-3 text-sm text-gray-400">
             👤 Barbeiro: {booking.barber.name}
           </p>
 
           <BookingInfo booking={booking} />
 
-          <SheetFooter className="flex-row gap-3 mt-6">
+          <SheetFooter className="mt-6 flex-row gap-3">
             <SheetClose asChild>
               <Button className="w-full" variant="secondary">
                 Voltar
@@ -175,7 +163,7 @@ const BookingItem = ({ booking }: BookingItemProps) => {
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
-                  disabled={!isBookingConfirmed || isDeleteLoading}
+                  disabled={!isBookingConfirmed || isCancelLoading}
                   className="w-full"
                   variant="destructive"
                 >
@@ -194,16 +182,16 @@ const BookingItem = ({ booking }: BookingItemProps) => {
                 </AlertDialogHeader>
 
                 <AlertDialogFooter className="flex-row gap-3">
-                  <AlertDialogCancel className="w-full mt-0">
+                  <AlertDialogCancel className="mt-0 w-full">
                     Voltar
                   </AlertDialogCancel>
 
                   <AlertDialogAction
-                    disabled={isDeleteLoading}
+                    disabled={isCancelLoading}
                     className="w-full"
                     onClick={handleCancelClick}
                   >
-                    {isDeleteLoading && (
+                    {isCancelLoading && (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     )}
                     Confirmar

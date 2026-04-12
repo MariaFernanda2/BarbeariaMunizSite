@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+
 import Footer from "./_components/footer";
 import AuthProvider from "./_providers/auth";
 import { Toaster } from "./_components/ui/sonner";
@@ -26,3 +27,24 @@ export const metadata: Metadata = {
     type: "website",
   },
 };
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="pt-BR">
+      <body className={`${inter.className} dark min-h-screen bg-background`}>
+        <AuthProvider>
+          <div className="flex min-h-screen flex-col">
+            <main className="flex-1">{children}</main>
+            <Footer />
+          </div>
+
+          <Toaster />
+        </AuthProvider>
+      </body>
+    </html>
+  );
+}

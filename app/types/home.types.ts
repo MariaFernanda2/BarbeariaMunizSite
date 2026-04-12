@@ -66,7 +66,7 @@ export type BookingSummary = {
     id: string;
     name: string;
     barbershopId: string;
-    price: number | string;
+    price: number;
     description: string;
     imageUrl: string;
   };

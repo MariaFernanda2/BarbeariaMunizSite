@@ -24,13 +24,19 @@ interface CustomerHomeProps {
   carouselItems: CarouselItem[];
 }
 
-export default function CustomerHome({
+const CustomerHome = ({
   session,
   recommendedBarbershops,
   confirmedBookings,
   lastCompletedBooking,
   carouselItems,
-}: CustomerHomeProps) {
+}: CustomerHomeProps) => {
+  const userName = session?.user?.name;
+
+  const hasCarouselItems = carouselItems.length > 0;
+  const hasConfirmedBookings = confirmedBookings.length > 0;
+  const hasRecommendedBarbershops = recommendedBarbershops.length > 0;
+
   return (
     <div>
       <Header />
@@ -39,22 +45,22 @@ export default function CustomerHome({
         <Search />
       </div>
 
-      <Greeting userName={session?.user?.name} />
+      <Greeting userName={userName} />
 
-      {carouselItems.length > 0 && (
-        <div className="mt-6">
+      {hasCarouselItems && (
+        <section className="mt-6">
           <SectionTitle>Confira nosso trabalho</SectionTitle>
           <Carousel items={carouselItems} />
           <EventsSection />
-        </div>
+        </section>
       )}
 
       {lastCompletedBooking && (
         <QuickRebookingBanner lastBooking={lastCompletedBooking} />
       )}
 
-      {confirmedBookings.length > 0 && (
-        <div className="mt-6">
+      {hasConfirmedBookings && (
+        <section className="mt-6">
           <SectionTitle className="pl-5">Agendamentos</SectionTitle>
 
           <div className="flex gap-3 overflow-x-auto px-5">
@@ -62,20 +68,27 @@ export default function CustomerHome({
               <BookingItem key={booking.id} booking={booking} />
             ))}
           </div>
-        </div>
+        </section>
       )}
 
-      <div className="mb-[4.5rem] mt-6">
-        <SectionTitle>Unidades</SectionTitle>
+      {hasRecommendedBarbershops && (
+        <section className="mt-6 mb-[4.5rem]">
+          <SectionTitle>Unidades</SectionTitle>
 
-        <div className="flex gap-4 overflow-x-auto px-5">
-          {recommendedBarbershops.map((barbershop) => (
-            <div key={barbershop.id} className="min-w-[167px] max-w-[167px]">
-              <BarbershopItem barbershop={barbershop} />
-            </div>
-          ))}
-        </div>
-      </div>
+          <div className="flex gap-4 overflow-x-auto px-5">
+            {recommendedBarbershops.map((barbershop) => (
+              <div
+                key={barbershop.id}
+                className="min-w-[167px] max-w-[167px]"
+              >
+                <BarbershopItem barbershop={barbershop} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
-}
+};
+
+export default CustomerHome;
