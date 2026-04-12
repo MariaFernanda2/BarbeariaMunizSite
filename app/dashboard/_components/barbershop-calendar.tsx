@@ -67,6 +67,7 @@ interface Props {
   scheduleBlocks: ScheduleBlock[];
   barbershopId: string;
   currentBarberId: string;
+  defaultOpenCreateBooking?: boolean;
 }
 
 const START_HOUR = 9;
@@ -188,6 +189,7 @@ export default function BarbershopCalendar({
   scheduleBlocks,
   barbershopId,
   currentBarberId,
+  defaultOpenCreateBooking,
 }: Props) {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [openActionMenuBarberId, setOpenActionMenuBarberId] = useState<string | null>(null);

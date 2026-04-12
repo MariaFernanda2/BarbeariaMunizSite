@@ -14,9 +14,10 @@ import { CalendarIcon, Gift } from "lucide-react";
 import QuickRebookingAction, {
   LastBooking,
 } from "./quick-rebooking-action";
+import { BookingSummary } from "@/app/types/home.types";
 
 interface QuickRebookingBannerProps {
-  lastBooking: LastBooking;
+  lastBooking: BookingSummary;
 }
 
 const QuickRebookingBanner = ({
