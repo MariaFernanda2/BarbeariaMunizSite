@@ -14,41 +14,51 @@ enum Role {
   ADMIN
 }
 
+enum BookingStatus {
+  CONFIRMED
+  COMPLETED
+  CANCELED
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?
   email         String?   @unique
   emailVerified DateTime?
   image         String?
-  accounts      Account[]
-  bookings      Booking[]
-  sessions      Session[]
   role          Role      @default(USER)
 
-  barber   Barber? @relation(fields: [barberId], references: [id])
   barberId String? @unique
+  barber   Barber? @relation(fields: [barberId], references: [id])
+
+  accounts Account[]
+  bookings Booking[]
+  reviews  BookingReview[]
+  sessions Session[]
 }
 
 model Barbershop {
-  id       String    @id @default(uuid())
+  id       String @id @default(uuid())
   name     String
   address  String
   imageUrl String
-  barbers  Barber[]
-  bookings Booking[]
-  services Service[]
+
+  barbers        Barber[]
+  bookings       Booking[]
+  services       Service[]
   scheduleBlocks ScheduleBlock[]
 }
 
 model Service {
-  id           String     @id @default(uuid())
+  id           String  @id @default(uuid())
   name         String
-  price        Decimal    @db.Decimal(10, 2)
+  price        Decimal @db.Decimal(10, 2)
   barbershopId String
   description  String
   imageUrl     String
-  bookings     Booking[]
-  barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
+
+  barbershop Barbershop @relation(fields: [barbershopId], references: [id])
+  bookings   Booking[]
 }
 
 model Barber {
@@ -57,35 +67,29 @@ model Barber {
   imageUrl     String
   barbershopId String
 
-  barbershop Barbershop @relation(fields: [barbershopId], references: [id])
-  bookings   Booking[]
+  barbershop     Barbershop          @relation(fields: [barbershopId], references: [id])
+  user           User?
+  bookings       Booking[]
   scheduleBlocks ScheduleBlock[]
-
-
-  user User?
-}
-
-enum BookingStatus {
-  CONFIRMED
-  COMPLETED
-  CANCELED
+  reviews        BookingReview[]
+  monthlyGoals   BarberMonthlyGoal[]
 }
 
 model Booking {
-  id           String   @id @default(uuid())
+  id           String        @id @default(uuid())
   userId       String
   serviceId    String
   barberId     String
   barbershopId String
   date         DateTime
+  status       BookingStatus @default(CONFIRMED)
 
-  status BookingStatus @default(CONFIRMED)
-
-  // 🔥 RELAÇÕES CORRETAS
   barber     Barber     @relation(fields: [barberId], references: [id])
   barbershop Barbershop @relation(fields: [barbershopId], references: [id])
   service    Service    @relation(fields: [serviceId], references: [id])
   user       User       @relation(fields: [userId], references: [id])
+
+  review BookingReview?
 }
 
 model Account {
@@ -101,7 +105,8 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -111,7 +116,8 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model VerificationToken {
@@ -133,6 +139,7 @@ model HaircutCarousel {
 
   @@map("haircut_carousel")
 }
+
 model ScheduleBlock {
   id           String   @id @default(uuid())
   barberId     String
@@ -146,28 +153,30 @@ model ScheduleBlock {
   barber     Barber     @relation(fields: [barberId], references: [id], onDelete: Cascade)
   barbershop Barbershop @relation(fields: [barbershopId], references: [id], onDelete: Cascade)
 }
+
 model BookingReview {
-  id         String   @id @default(uuid())
-  bookingId  String   @unique
-  barberId   String
-  userId     String
-  rating     Int
-  comment    String?
-  createdAt  DateTime @default(now())
+  id        String   @id @default(uuid())
+  bookingId String   @unique
+  barberId  String
+  userId    String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
 
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   barber  Barber  @relation(fields: [barberId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
 model BarberMonthlyGoal {
-  id        String   @id @default(uuid())
-  barberId  String
-  month     Int
-  year      Int
+  id             String   @id @default(uuid())
+  barberId       String
+  month          Int
+  year           Int
   targetBookings Int?
-  targetRevenue  Decimal? @db.Decimal(10,2)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  targetRevenue  Decimal? @db.Decimal(10, 2)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   barber Barber @relation(fields: [barberId], references: [id], onDelete: Cascade)
 }
