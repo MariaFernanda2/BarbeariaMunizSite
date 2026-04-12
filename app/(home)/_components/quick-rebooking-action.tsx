@@ -1,6 +1,6 @@
 "use client";
 
-import { addDays, format, setHours, setMinutes } from "date-fns";
+import { addDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -11,6 +11,10 @@ import { toast } from "sonner";
 import { Button } from "@/app/_components/ui/button";
 import { Calendar } from "@/app/_components/ui/calendar";
 import { generateDayTimeList } from "../../barbershops/[id]/_helpers/hours";
+import {
+  buildUtcDateFromLocalSelection,
+  formatBookingInAppTimeZone,
+} from "@/app/lib/utils/timezone";
 
 import type {
   Barber,
@@ -90,15 +94,9 @@ const QuickRebookingAction = ({
     const generatedTimes = generateDayTimeList(selectedDate);
 
     return generatedTimes.filter((time) => {
-      const [hour, minutes] = time.split(":").map(Number);
-
       const hasBookingAtTime = dayBookings.some((booking) => {
-        const bookingDate = new Date(booking.date);
-
-        return (
-          bookingDate.getHours() === hour &&
-          bookingDate.getMinutes() === minutes
-        );
+        const bookingHour = formatBookingInAppTimeZone(booking.date, "HH:mm");
+        return bookingHour === time;
       });
 
       return !hasBookingAtTime;
@@ -112,12 +110,7 @@ const QuickRebookingAction = ({
 
   const buildBookingDate = () => {
     if (!selectedDate || !selectedHour) return null;
-
-    const [hour, minutes] = selectedHour.split(":").map(Number);
-
-    const date = new Date(selectedDate);
-    date.setHours(hour, minutes, 0, 0);
-    return date;
+    return buildUtcDateFromLocalSelection(selectedDate, selectedHour);
   };
 
   const handleBookingSubmit = async () => {
@@ -157,11 +150,9 @@ const QuickRebookingAction = ({
       resetForm();
 
       toast("Reagendamento realizado!", {
-        description: format(
-          bookingDate,
-          `'Corte com ${barber.name} para' dd 'de' MMMM 'às' HH':'mm`,
-          { locale: ptBR }
-        ),
+        description: `${service.name} com ${barber.name} para ${format(selectedDate, "dd 'de' MMMM", {
+          locale: ptBR,
+        })} às ${selectedHour}`,
         action: {
           label: "Ver Agendamentos",
           onClick: () => router.push("/bookings"),
@@ -225,9 +216,7 @@ const QuickRebookingAction = ({
           disabled={!selectedDate || !selectedHour || isSubmitting}
           className="w-full"
         >
-          {isSubmitting && (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          )}
+          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Confirmar Reagendamento
         </Button>
       </div>
