@@ -148,9 +148,10 @@ export async function getBarberDashboardData({
     servicesCounter.set(serviceName, (servicesCounter.get(serviceName) ?? 0) + 1);
   }
 
-  const topService =
-    [...servicesCounter.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ??
-    "Sem dados";
+  const entries = Array.from(servicesCounter.entries());
+
+const topService =
+  entries.sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Sem dados";
 
   const heroStats = {
     todayBookings: todayBookingsCount,
