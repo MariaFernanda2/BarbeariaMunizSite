@@ -3,6 +3,9 @@ export interface BookingResponseDTO {
   date: string;
   status: "CONFIRMED" | "COMPLETED" | "CANCELED";
 
+  clientName?: string;
+  clientPhone?: string;
+
   service: {
     id: string;
     name: string;

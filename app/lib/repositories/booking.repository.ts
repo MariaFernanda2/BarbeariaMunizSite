@@ -7,6 +7,8 @@ export class BookingRepository {
     barberId: string;
     barbershopId: string;
     date: Date;
+    clientName?: string;
+    clientPhone?: string;
   }) {
     return db.booking.create({
       data: {
@@ -15,6 +17,8 @@ export class BookingRepository {
         barberId: data.barberId,
         barbershopId: data.barbershopId,
         date: data.date,
+        clientName: data.clientName,
+        clientPhone: data.clientPhone,
         status: "CONFIRMED",
       },
       include: {
@@ -64,7 +68,6 @@ export class BookingRepository {
       },
     });
   }
-  
 
   async update(
     id: string,

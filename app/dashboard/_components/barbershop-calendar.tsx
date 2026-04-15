@@ -35,6 +35,8 @@ type Booking = {
     name: string;
     price: any;
   };
+  clientName?: string | null;
+  clientPhone?: string | null;
 };
 
 type ScheduleBlock = {
@@ -112,6 +114,20 @@ function parseDatetimeLocalToUtc(value: string) {
     timePart,
     APP_TIME_ZONE
   );
+}
+
+function formatPhone(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+
+  if (digits.length <= 2) {
+    return digits;
+  }
+
+  if (digits.length <= 7) {
+    return digits.replace(/^(\d{2})(\d+)/, "($1) $2");
+  }
+
+  return digits.replace(/^(\d{2})(\d{5})(\d+)/, "($1) $2-$3");
 }
 
 function getTopFromDate(date: Date) {
@@ -214,6 +230,7 @@ export default function BarbershopCalendar({
   const [selectedBarberId, setSelectedBarberId] = useState(currentBarberId);
   const [selectedDateTime, setSelectedDateTime] = useState("");
   const [clientName, setClientName] = useState("");
+  const [clientPhone, setClientPhone] = useState("");
   const [serviceId, setServiceId] = useState("");
 
   const [blockStartDateTime, setBlockStartDateTime] = useState("");
@@ -300,6 +317,7 @@ export default function BarbershopCalendar({
     setSelectedBarberId(barberId);
     setSelectedDateTime(date ? toDatetimeLocal(date) : "");
     setClientName("");
+    setClientPhone("");
     setServiceId("");
     setOpenActionMenuBarberId(null);
     setIsCreateModalOpen(true);
@@ -310,6 +328,7 @@ export default function BarbershopCalendar({
     setSelectedBarberId(currentBarberId);
     setSelectedDateTime("");
     setClientName("");
+    setClientPhone("");
     setServiceId("");
   }
 
@@ -344,6 +363,11 @@ export default function BarbershopCalendar({
   async function handleCreateBooking(e: React.FormEvent) {
     e.preventDefault();
 
+    if (!clientName.trim() || !clientPhone.trim()) {
+      alert("Informe o nome e o WhatsApp do cliente.");
+      return;
+    }
+
     try {
       setIsSavingCreate(true);
 
@@ -357,7 +381,8 @@ export default function BarbershopCalendar({
         body: JSON.stringify({
           barberId: selectedBarberId,
           barbershopId,
-          clientName,
+          clientName: clientName.trim(),
+          clientPhone: clientPhone.trim(),
           serviceId,
           date: utcDate.toISOString(),
         }),
@@ -420,7 +445,11 @@ export default function BarbershopCalendar({
     <>
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-2">
-          <button type="button" onClick={handlePrevious} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-zinc-300 bg-white text-2xl text-zinc-700 shadow-sm transition hover:bg-zinc-100">
+          <button
+            type="button"
+            onClick={handlePrevious}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-zinc-300 bg-white text-2xl text-zinc-700 shadow-sm transition hover:bg-zinc-100"
+          >
             ‹
           </button>
 
@@ -433,7 +462,11 @@ export default function BarbershopCalendar({
             </p>
           </div>
 
-          <button type="button" onClick={handleNext} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-zinc-300 bg-white text-2xl text-zinc-700 shadow-sm transition hover:bg-zinc-100">
+          <button
+            type="button"
+            onClick={handleNext}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-zinc-300 bg-white text-2xl text-zinc-700 shadow-sm transition hover:bg-zinc-100"
+          >
             ›
           </button>
         </div>
@@ -441,11 +474,18 @@ export default function BarbershopCalendar({
         <div className="lg:hidden">
           <div className="space-y-4">
             {groupedEvents.map(({ barber, events }) => (
-              <div key={barber.id} className="overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-900 shadow-lg">
+              <div
+                key={barber.id}
+                className="overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-900 shadow-lg"
+              >
                 <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-4">
                   <div className="flex min-w-0 items-center gap-3">
                     {barber.imageUrl ? (
-                      <img src={barber.imageUrl} alt={barber.name} className="h-11 w-11 rounded-full border border-zinc-700 object-cover" />
+                      <img
+                        src={barber.imageUrl}
+                        alt={barber.name}
+                        className="h-11 w-11 rounded-full border border-zinc-700 object-cover"
+                      />
                     ) : (
                       <div className="flex h-11 w-11 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800 text-sm font-bold text-white">
                         {barber.name?.[0] ?? "B"}
@@ -453,7 +493,9 @@ export default function BarbershopCalendar({
                     )}
 
                     <div className="min-w-0">
-                      <p className="truncate font-semibold text-white">{barber.name}</p>
+                      <p className="truncate font-semibold text-white">
+                        {barber.name}
+                      </p>
                       <p className="text-xs text-zinc-400">Agenda do dia</p>
                     </div>
                   </div>
@@ -469,11 +511,19 @@ export default function BarbershopCalendar({
 
                     {openActionMenuBarberId === barber.id && (
                       <div className="absolute right-0 top-12 z-30 w-56 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl">
-                        <button type="button" onClick={() => openCreateModal(barber.id)} className="flex w-full items-center px-4 py-3 text-left text-sm text-white transition hover:bg-zinc-900">
+                        <button
+                          type="button"
+                          onClick={() => openCreateModal(barber.id)}
+                          className="flex w-full items-center px-4 py-3 text-left text-sm text-white transition hover:bg-zinc-900"
+                        >
                           Novo agendamento
                         </button>
 
-                        <button type="button" onClick={() => openBlockModal(barber.id)} className="flex w-full items-center px-4 py-3 text-left text-sm text-white transition hover:bg-zinc-900">
+                        <button
+                          type="button"
+                          onClick={() => openBlockModal(barber.id)}
+                          className="flex w-full items-center px-4 py-3 text-left text-sm text-white transition hover:bg-zinc-900"
+                        >
                           Bloqueio de agenda
                         </button>
                       </div>
@@ -495,7 +545,9 @@ export default function BarbershopCalendar({
                           <button
                             key={booking.id}
                             onClick={() => setSelectedBooking(booking)}
-                            className={`w-full rounded-2xl border p-4 text-left shadow-lg ${getBookingStatusClasses(booking.status)}`}
+                            className={`w-full rounded-2xl border p-4 text-left shadow-lg ${getBookingStatusClasses(
+                              booking.status
+                            )}`}
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
@@ -503,7 +555,7 @@ export default function BarbershopCalendar({
                                   {formatTime(event.start)}
                                 </p>
                                 <p className="mt-1 truncate text-sm font-bold">
-                                  {booking.user.name || "Cliente"}
+                                  {booking.clientName || booking.user.name || "Cliente"}
                                 </p>
                                 <p className="truncate text-xs opacity-90">
                                   {booking.service.name}
@@ -521,7 +573,10 @@ export default function BarbershopCalendar({
                       const block = event.data;
 
                       return (
-                        <div key={block.id} className={`w-full rounded-2xl border p-4 text-left shadow-lg ${getBlockClasses()}`}>
+                        <div
+                          key={block.id}
+                          className={`w-full rounded-2xl border p-4 text-left shadow-lg ${getBlockClasses()}`}
+                        >
                           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-200">
                             Bloqueado
                           </p>
@@ -559,7 +614,11 @@ export default function BarbershopCalendar({
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex min-w-0 items-center gap-3">
                             {barber.imageUrl ? (
-                              <img src={barber.imageUrl} alt={barber.name} className="h-11 w-11 rounded-full border border-zinc-700 object-cover" />
+                              <img
+                                src={barber.imageUrl}
+                                alt={barber.name}
+                                className="h-11 w-11 rounded-full border border-zinc-700 object-cover"
+                              />
                             ) : (
                               <div className="flex h-11 w-11 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800 text-sm font-bold">
                                 {barber.name?.[0] ?? "B"}
@@ -567,8 +626,12 @@ export default function BarbershopCalendar({
                             )}
 
                             <div className="min-w-0">
-                              <p className="truncate font-semibold text-white">{barber.name}</p>
-                              <p className="text-xs text-zinc-400">Agenda do dia • 09:00 às 20:00</p>
+                              <p className="truncate font-semibold text-white">
+                                {barber.name}
+                              </p>
+                              <p className="text-xs text-zinc-400">
+                                Agenda do dia • 09:00 às 20:00
+                              </p>
                             </div>
                           </div>
 
@@ -583,11 +646,19 @@ export default function BarbershopCalendar({
 
                             {openActionMenuBarberId === barber.id && (
                               <div className="absolute right-0 top-12 z-30 w-56 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl">
-                                <button type="button" onClick={() => openCreateModal(barber.id)} className="flex w-full items-center px-4 py-3 text-left text-sm text-white transition hover:bg-zinc-900">
+                                <button
+                                  type="button"
+                                  onClick={() => openCreateModal(barber.id)}
+                                  className="flex w-full items-center px-4 py-3 text-left text-sm text-white transition hover:bg-zinc-900"
+                                >
                                   Novo agendamento
                                 </button>
 
-                                <button type="button" onClick={() => openBlockModal(barber.id)} className="flex w-full items-center px-4 py-3 text-left text-sm text-white transition hover:bg-zinc-900">
+                                <button
+                                  type="button"
+                                  onClick={() => openBlockModal(barber.id)}
+                                  className="flex w-full items-center px-4 py-3 text-left text-sm text-white transition hover:bg-zinc-900"
+                                >
                                   Bloqueio de agenda
                                 </button>
                               </div>
@@ -642,7 +713,9 @@ export default function BarbershopCalendar({
                               <button
                                 key={booking.id}
                                 onClick={() => setSelectedBooking(booking)}
-                                className={`absolute left-2 right-2 rounded-2xl border p-3 text-left shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl ${getBookingStatusClasses(booking.status)}`}
+                                className={`absolute left-2 right-2 rounded-2xl border p-3 text-left shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl ${getBookingStatusClasses(
+                                  booking.status
+                                )}`}
                                 style={{
                                   top,
                                   height: BOOKING_CARD_HEIGHT,
@@ -654,7 +727,7 @@ export default function BarbershopCalendar({
                                       {formatTime(event.start)}
                                     </p>
                                     <p className="truncate text-sm font-bold">
-                                      {booking.user.name || "Cliente"}
+                                      {booking.clientName || booking.user.name || "Cliente"}
                                     </p>
                                     <p className="truncate text-xs opacity-90">
                                       {booking.service.name}
@@ -704,7 +777,10 @@ export default function BarbershopCalendar({
                 </div>
               </div>
 
-              <BookingDrawer booking={selectedBooking} onClose={() => setSelectedBooking(null)} />
+              <BookingDrawer
+                booking={selectedBooking}
+                onClose={() => setSelectedBooking(null)}
+              />
             </div>
           </div>
         </div>
@@ -721,7 +797,11 @@ export default function BarbershopCalendar({
                 </p>
               </div>
 
-              <button type="button" onClick={closeCreateModal} className="rounded-lg px-3 py-1 text-zinc-400 hover:bg-zinc-900 hover:text-white">
+              <button
+                type="button"
+                onClick={closeCreateModal}
+                className="rounded-lg px-3 py-1 text-zinc-400 hover:bg-zinc-900 hover:text-white"
+              >
                 ✕
               </button>
             </div>
@@ -753,6 +833,20 @@ export default function BarbershopCalendar({
                   onChange={(e) => setClientName(e.target.value)}
                   placeholder="Nome do cliente"
                   className="w-full rounded-2xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-white placeholder:text-zinc-500 outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-zinc-200">
+                  WhatsApp
+                </label>
+                <input
+                  value={clientPhone}
+                  onChange={(e) => setClientPhone(formatPhone(e.target.value))}
+                  placeholder="(11) 99999-9999"
+                  className="w-full rounded-2xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-white placeholder:text-zinc-500 outline-none"
+                  inputMode="numeric"
                   required
                 />
               </div>
@@ -800,7 +894,11 @@ export default function BarbershopCalendar({
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={closeCreateModal} className="rounded-2xl border border-zinc-700 px-4 py-3 text-sm font-semibold text-zinc-200 transition hover:bg-zinc-900">
+                <button
+                  type="button"
+                  onClick={closeCreateModal}
+                  className="rounded-2xl border border-zinc-700 px-4 py-3 text-sm font-semibold text-zinc-200 transition hover:bg-zinc-900"
+                >
                   Cancelar
                 </button>
 
@@ -828,7 +926,11 @@ export default function BarbershopCalendar({
                 </p>
               </div>
 
-              <button type="button" onClick={closeBlockModal} className="rounded-lg px-3 py-1 text-zinc-400 hover:bg-zinc-900 hover:text-white">
+              <button
+                type="button"
+                onClick={closeBlockModal}
+                className="rounded-lg px-3 py-1 text-zinc-400 hover:bg-zinc-900 hover:text-white"
+              >
                 ✕
               </button>
             </div>

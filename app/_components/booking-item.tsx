@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { format, isFuture } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -33,21 +31,72 @@ import {
 } from "./ui/sheet";
 
 import BookingInfo from "./booking-info";
-
 import type { BookingSummary } from "@/app/types/home.types";
+import {
+  APP_TIME_ZONE,
+  formatBookingInAppTimeZone,
+} from "@/app/lib/utils/timezone";
 
 interface BookingItemProps {
   booking: BookingSummary;
 }
 
+function getStatusLabel(status: BookingSummary["status"]) {
+  switch (status) {
+    case "CONFIRMED":
+      return "Confirmado";
+    case "COMPLETED":
+      return "Finalizado";
+    case "CANCELED":
+      return "Cancelado";
+    default:
+      return status;
+  }
+}
+
+function getStatusVariant(
+  status: BookingSummary["status"]
+): "default" | "secondary" | "destructive" | "outline" {
+  switch (status) {
+    case "CONFIRMED":
+      return "default";
+    case "COMPLETED":
+      return "secondary";
+    case "CANCELED":
+      return "destructive";
+    default:
+      return "outline";
+  }
+}
+
+function canCancelBooking(status: BookingSummary["status"]) {
+  return status === "CONFIRMED";
+}
+
 const BookingItem = ({ booking }: BookingItemProps) => {
   const [isCancelLoading, setIsCancelLoading] = useState(false);
 
-  const bookingDate = new Date(booking.date);
-  const isBookingConfirmed = isFuture(bookingDate);
+  const statusLabel = getStatusLabel(booking.status);
+  const statusVariant = getStatusVariant(booking.status);
+  const canCancel = canCancelBooking(booking.status);
 
-  const statusLabel = isBookingConfirmed ? "Confirmado" : "Finalizado";
-  const statusVariant = isBookingConfirmed ? "default" : "secondary";
+  const bookingMonth = formatBookingInAppTimeZone(
+    booking.date,
+    "MMMM",
+    APP_TIME_ZONE
+  );
+
+  const bookingDay = formatBookingInAppTimeZone(
+    booking.date,
+    "dd",
+    APP_TIME_ZONE
+  );
+
+  const bookingHour = formatBookingInAppTimeZone(
+    booking.date,
+    "HH:mm",
+    APP_TIME_ZONE
+  );
 
   const handleCancelClick = async () => {
     setIsCancelLoading(true);
@@ -62,6 +111,7 @@ const BookingItem = ({ booking }: BookingItemProps) => {
       }
 
       toast.success("Reserva cancelada com sucesso!");
+      window.location.reload();
     } catch (error) {
       console.error(error);
       toast.error("Erro ao cancelar reserva.");
@@ -73,7 +123,7 @@ const BookingItem = ({ booking }: BookingItemProps) => {
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <Card className="min-w-full">
+        <Card className="min-w-full cursor-pointer transition hover:opacity-95">
           <CardContent className="flex px-0 py-0">
             <div className="flex flex-[3] flex-col gap-2 py-5 pl-5">
               <Badge variant={statusVariant} className="w-fit">
@@ -88,7 +138,7 @@ const BookingItem = ({ booking }: BookingItemProps) => {
 
               <div className="flex items-center gap-2">
                 <Avatar className="h-6 w-6">
-                  <AvatarImage src={booking.barbershop.imageUrl} />
+                  <AvatarImage src={booking.barbershop.imageUrl ?? undefined} />
                   <AvatarFallback>
                     {booking.barbershop.name.charAt(0)}
                   </AvatarFallback>
@@ -99,11 +149,9 @@ const BookingItem = ({ booking }: BookingItemProps) => {
             </div>
 
             <div className="flex flex-1 flex-col items-center justify-center border-l border-solid border-secondary">
-              <p className="text-sm capitalize">
-                {format(bookingDate, "MMMM", { locale: ptBR })}
-              </p>
-              <p className="text-2xl">{format(bookingDate, "dd")}</p>
-              <p className="text-sm">{format(bookingDate, "HH:mm")}</p>
+              <p className="text-sm capitalize">{bookingMonth}</p>
+              <p className="text-2xl">{bookingDay}</p>
+              <p className="text-sm">{bookingHour}</p>
             </div>
           </CardContent>
         </Card>
@@ -126,7 +174,7 @@ const BookingItem = ({ booking }: BookingItemProps) => {
               <Card>
                 <CardContent className="flex gap-2 p-3">
                   <Avatar>
-                    <AvatarImage src={booking.barbershop.imageUrl} />
+                    <AvatarImage src={booking.barbershop.imageUrl ?? undefined} />
                     <AvatarFallback>
                       {booking.barbershop.name.charAt(0)}
                     </AvatarFallback>
@@ -163,7 +211,7 @@ const BookingItem = ({ booking }: BookingItemProps) => {
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
-                  disabled={!isBookingConfirmed || isCancelLoading}
+                  disabled={!canCancel || isCancelLoading}
                   className="w-full"
                   variant="destructive"
                 >

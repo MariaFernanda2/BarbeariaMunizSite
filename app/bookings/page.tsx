@@ -1,5 +1,6 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
+import { Prisma } from "@prisma/client";
 
 import Header from "../_components/header";
 import BookingItem from "../_components/booking-item";
@@ -7,52 +8,16 @@ import { authOptions } from "../lib/auth";
 import { db } from "../lib/repositories/prisma";
 import type { BookingSummary } from "@/app/types/home.types";
 
-const BookingsPage = async () => {
-  const session = await getServerSession(authOptions);
+type BookingWithRelations = Prisma.BookingGetPayload<{
+  include: {
+    service: true;
+    barbershop: true;
+    barber: true;
+  };
+}>;
 
-  if (!session?.user) {
-    redirect("/");
-  }
-
-  const userId = (session.user as any).id;
-
-  const [confirmedBookingsRaw, finishedBookingsRaw] = await Promise.all([
-    db.booking.findMany({
-      where: {
-        userId,
-        date: {
-          gte: new Date(),
-        },
-      },
-      include: {
-        service: true,
-        barbershop: true,
-        barber: true,
-      },
-      orderBy: {
-        date: "asc",
-      },
-    }),
-
-    db.booking.findMany({
-      where: {
-        userId,
-        date: {
-          lt: new Date(),
-        },
-      },
-      include: {
-        service: true,
-        barbershop: true,
-        barber: true,
-      },
-      orderBy: {
-        date: "desc",
-      },
-    }),
-  ]);
-
-  const normalizeBooking = (booking: typeof confirmedBookingsRaw[number]): BookingSummary => ({
+function normalizeBooking(booking: BookingWithRelations): BookingSummary {
+  return {
     id: booking.id,
     date: booking.date.toISOString(),
     status: booking.status,
@@ -75,10 +40,50 @@ const BookingsPage = async () => {
       imageUrl: booking.barbershop.imageUrl,
       address: booking.barbershop.address,
     },
+  };
+}
+
+const BookingsPage = async () => {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user) {
+    redirect("/");
+  }
+
+  const userId = (session.user as any).id;
+
+  const bookingsRaw: BookingWithRelations[] = await db.booking.findMany({
+    where: {
+      userId,
+    },
+    include: {
+      service: true,
+      barbershop: true,
+      barber: true,
+    },
+    orderBy: {
+      date: "asc",
+    },
   });
 
-  const confirmedBookings = confirmedBookingsRaw.map(normalizeBooking);
-  const finishedBookings = finishedBookingsRaw.map(normalizeBooking);
+  const normalizedBookings = bookingsRaw.map(normalizeBooking);
+
+  const confirmedBookings = normalizedBookings.filter(
+    (booking) => booking.status === "CONFIRMED"
+  );
+
+  const finishedBookings = normalizedBookings
+    .filter((booking) => booking.status === "COMPLETED")
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const canceledBookings = normalizedBookings
+    .filter((booking) => booking.status === "CANCELED")
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const hasBookings =
+    confirmedBookings.length > 0 ||
+    finishedBookings.length > 0 ||
+    canceledBookings.length > 0;
 
   return (
     <>
@@ -86,6 +91,12 @@ const BookingsPage = async () => {
 
       <div className="px-5 py-6">
         <h1 className="mb-6 text-xl font-bold">Agendamentos</h1>
+
+        {!hasBookings && (
+          <p className="text-sm text-gray-400">
+            Você ainda não possui agendamentos.
+          </p>
+        )}
 
         {confirmedBookings.length > 0 && (
           <>
@@ -109,6 +120,20 @@ const BookingsPage = async () => {
 
             <div className="flex flex-col gap-3">
               {finishedBookings.map((booking) => (
+                <BookingItem key={booking.id} booking={booking} />
+              ))}
+            </div>
+          </>
+        )}
+
+        {canceledBookings.length > 0 && (
+          <>
+            <h2 className="mb-3 mt-6 text-sm font-bold uppercase text-gray-400">
+              Cancelados
+            </h2>
+
+            <div className="flex flex-col gap-3">
+              {canceledBookings.map((booking) => (
                 <BookingItem key={booking.id} booking={booking} />
               ))}
             </div>

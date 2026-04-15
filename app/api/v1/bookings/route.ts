@@ -24,13 +24,18 @@ export async function POST(request: NextRequest) {
     }
 
     const sessionUser = session.user as SessionUser;
-    const { id: sessionUserId, role, barbershopId: sessionBarbershopId } = sessionUser;
+    const {
+      id: sessionUserId,
+      role,
+      barbershopId: sessionBarbershopId,
+    } = sessionUser;
 
     const body = await request.json();
 
     const {
       userId,
       clientName,
+      clientPhone,
       serviceId,
       barberId,
       barbershopId,
@@ -68,6 +73,7 @@ export async function POST(request: NextRequest) {
     let bookingPayload: {
       userId?: string;
       clientName?: string;
+      clientPhone?: string;
       serviceId: string;
       barberId: string;
       barbershopId: string;
@@ -75,8 +81,20 @@ export async function POST(request: NextRequest) {
     };
 
     if (role === "USER") {
+      if (!clientName || !clientPhone) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Informe seu nome e WhatsApp.",
+          },
+          { status: 400 }
+        );
+      }
+
       bookingPayload = {
         userId: sessionUserId,
+        clientName,
+        clientPhone,
         serviceId,
         barberId,
         barbershopId,
@@ -96,7 +114,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             success: false,
-            message: "Você só pode criar agendamentos para barbeiros da sua unidade.",
+            message:
+              "Você só pode criar agendamentos para barbeiros da sua unidade.",
           },
           { status: 403 }
         );
@@ -112,6 +131,7 @@ export async function POST(request: NextRequest) {
       bookingPayload = {
         userId,
         clientName,
+        clientPhone,
         serviceId,
         barberId,
         barbershopId,
@@ -128,6 +148,7 @@ export async function POST(request: NextRequest) {
       bookingPayload = {
         userId,
         clientName,
+        clientPhone,
         serviceId,
         barberId,
         barbershopId,
@@ -141,7 +162,6 @@ export async function POST(request: NextRequest) {
     }
 
     const bookingService = new BookingService();
-
     const booking = await bookingService.create(bookingPayload);
 
     return NextResponse.json(
