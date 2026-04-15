@@ -123,6 +123,9 @@ async function seedDatabase() {
   } catch (error) {
     console.error('Erro ao popular dados:', error);
   }
+  finally {
+    await prisma.$disconnect();
+  }
 }
 
 // Chamar a função seedDatabase para iniciar o processo de seeding do banco de dados
