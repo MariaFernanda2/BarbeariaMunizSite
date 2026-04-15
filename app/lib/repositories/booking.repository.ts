@@ -1,31 +1,43 @@
-import { db } from "@/app/lib/repositories/prisma";
+import { db } from "./prisma";
 
 export class BookingRepository {
-  async create(data: any) {
+  async create(data: {
+    userId: string;
+    serviceId: string;
+    barberId: string;
+    barbershopId: string;
+    date: Date;
+    clientName?: string;
+    clientPhone?: string;
+  }) {
     return db.booking.create({
       data: {
-        date: new Date(data.date),
-
-        // Conecta usuário existente ou cria
-        user: {
-  connectOrCreate: {
-    where: { id: data.userId },
-    create: {
-      id: data.userId,
-      name: data.userName || "Usuário do Google",
-      email: data.userEmail || "",
-    },
-  },
-},
-
-        // Conecta relações obrigatórias
-        barber: { connect: { id: data.barberId } },
-        barbershop: { connect: { id: data.barbershopId } },
-        service: { connect: { id: data.serviceId } },
+        userId: data.userId,
+        serviceId: data.serviceId,
+        barberId: data.barberId,
+        barbershopId: data.barbershopId,
+        date: data.date,
+        clientName: data.clientName,
+        clientPhone: data.clientPhone,
+        status: "CONFIRMED",
       },
       include: {
         service: true,
         barbershop: true,
+        barber: true,
+        user: true,
+      },
+    });
+  }
+
+  async findByDateAndBarber(date: Date, barberId: string) {
+    return db.booking.findFirst({
+      where: {
+        barberId,
+        date,
+        status: {
+          not: "CANCELED",
+        },
       },
     });
   }
@@ -33,21 +45,11 @@ export class BookingRepository {
   async findById(id: string) {
     return db.booking.findUnique({
       where: { id },
-      include: { service: true, barbershop: true },
-    });
-  }
-
-  async delete(id: string) {
-    return db.booking.delete({
-      where: { id },
-    });
-  }
-
-  async findByDateAndBarber(date: Date, barberId: string) {
-    return db.booking.findFirst({
-      where: {
-        date,
-        barberId,
+      include: {
+        service: true,
+        barbershop: true,
+        barber: true,
+        user: true,
       },
     });
   }
@@ -58,9 +60,39 @@ export class BookingRepository {
       include: {
         service: true,
         barbershop: true,
+        barber: true,
+        user: true,
       },
       orderBy: {
         date: "desc",
+      },
+    });
+  }
+
+  async update(
+    id: string,
+    data: {
+      date?: Date;
+      status?: "CONFIRMED" | "COMPLETED" | "CANCELED";
+    }
+  ) {
+    return db.booking.update({
+      where: { id },
+      data,
+      include: {
+        service: true,
+        barbershop: true,
+        barber: true,
+        user: true,
+      },
+    });
+  }
+
+  async delete(id: string) {
+    return db.booking.update({
+      where: { id },
+      data: {
+        status: "CANCELED",
       },
     });
   }

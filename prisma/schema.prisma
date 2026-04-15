@@ -3,30 +3,36 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  directUrl    = env("DIRECT_URL")
   relationMode = "prisma"
 }
 
 model User {
-  id            String    @id @default(cuid())
+  id            String          @id @default(cuid())
   name          String?
-  email         String?   @unique
+  email         String?         @unique
   emailVerified DateTime?
   image         String?
+  role          Role            @default(USER)
+  barberId      String?         @unique
+  barber        Barber?         @relation(fields: [barberId], references: [id])
   accounts      Account[]
   bookings      Booking[]
+  reviews       BookingReview[]
   sessions      Session[]
 }
 
 model Barbershop {
-  id       String    @id @default(uuid())
-  name     String
-  address  String
-  imageUrl String
-  barbers  Barber[]
-  bookings Booking[]
-  services Service[]
+  id             String          @id @default(uuid())
+  name           String
+  address        String
+  imageUrl       String
+  barbers        Barber[]
+  bookings       Booking[]
+  services       Service[]
+  scheduleBlocks ScheduleBlock[]
 }
 
 model Service {
@@ -36,30 +42,38 @@ model Service {
   barbershopId String
   description  String
   imageUrl     String
-  bookings     Booking[]
   barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
+  bookings     Booking[]
 }
 
 model Barber {
-  id           String     @id @default(uuid())
-  name         String
-  imageUrl     String
-  barbershopId String
-  barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
-  bookings     Booking[]
+  id             String              @id
+  name           String
+  imageUrl       String
+  barbershopId   String
+  barbershop     Barbershop          @relation(fields: [barbershopId], references: [id])
+  user           User?
+  bookings       Booking[]
+  scheduleBlocks ScheduleBlock[]
+  reviews        BookingReview[]
+  monthlyGoals   BarberMonthlyGoal[]
 }
 
 model Booking {
-  id           String     @id @default(uuid())
+  id           String         @id @default(uuid())
   userId       String
   serviceId    String
   barberId     String
   barbershopId String
   date         DateTime
-  barber       Barber     @relation(fields: [barberId], references: [id])
-  barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
-  service      Service    @relation(fields: [serviceId], references: [id])
-  user         User       @relation(fields: [userId], references: [id])
+  status       BookingStatus  @default(CONFIRMED)
+  clientName   String?
+  clientPhone  String?
+  barber       Barber         @relation(fields: [barberId], references: [id])
+  barbershop   Barbershop     @relation(fields: [barbershopId], references: [id])
+  service      Service        @relation(fields: [serviceId], references: [id])
+  user         User           @relation(fields: [userId], references: [id])
+  review       BookingReview?
 }
 
 model Account {
@@ -94,4 +108,66 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model HaircutCarousel {
+  id            Int      @id @default(autoincrement())
+  image_url     String
+  description   String?
+  display_order Int
+  active        Boolean  @default(true)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@map("haircut_carousel")
+}
+
+model ScheduleBlock {
+  id           String     @id @default(uuid())
+  barberId     String
+  barbershopId String
+  startDate    DateTime
+  endDate      DateTime
+  reason       String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  barber       Barber     @relation(fields: [barberId], references: [id], onDelete: Cascade)
+  barbershop   Barbershop @relation(fields: [barbershopId], references: [id], onDelete: Cascade)
+}
+
+model BookingReview {
+  id        String   @id @default(uuid())
+  bookingId String   @unique
+  barberId  String
+  userId    String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  barber    Barber   @relation(fields: [barberId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BarberMonthlyGoal {
+  id             String   @id @default(uuid())
+  barberId       String
+  month          Int
+  year           Int
+  targetBookings Int?
+  targetRevenue  Decimal? @db.Decimal(10, 2)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  barber         Barber   @relation(fields: [barberId], references: [id], onDelete: Cascade)
+}
+
+enum Role {
+  USER
+  BARBER
+  ADMIN
+}
+
+enum BookingStatus {
+  CONFIRMED
+  COMPLETED
+  CANCELED
 }

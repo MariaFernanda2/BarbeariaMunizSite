@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { BarbershopRepository } from "@/app/lib/repositories/barbershop.repository";
 import { BarbershopService } from "@/app/lib/services/barbershop.service";
+import { BookingRepository } from "@/app/lib/repositories/booking.repository";
+import { BookingService } from "@/app/lib/services/booking.service";
 import { AppError } from "@/app/lib/errors/app-error";
-import { authenticate } from "@/app/lib/auth/middleware";
 
 interface Params {
   params: {
@@ -15,9 +16,6 @@ export async function GET(
   { params }: Params
 ) {
   try {
-    // 🔐 Autenticação via Bearer Token
-    const user = authenticate(request);
-
     const service = new BarbershopService(
       new BarbershopRepository()
     );
@@ -27,27 +25,80 @@ export async function GET(
     return NextResponse.json({
       success: true,
       data: barbershop,
-      requestedBy: user, // opcional (para debug)
+    });
+  } catch (error) {
+    return handleError(error);
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: Params
+) {
+  try {
+    const body = await request.json();
+
+    const service = new BookingService(
+      new BookingRepository()
+    );
+
+    const updatedBooking = await service.updateBooking(params.id, {
+      date: body.date,
+      status: body.status,
     });
 
+    return NextResponse.json({
+      success: true,
+      message: "Agendamento atualizado com sucesso",
+      data: updatedBooking,
+    });
   } catch (error) {
-    if (error instanceof AppError) {
-      return NextResponse.json(
-        { success: false, message: error.message },
-        { status: error.statusCode }
-      );
-    }
-
-    if (error instanceof Error && error.message === "Unauthorized") {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 }
-      );
-    }
+    console.error("Erro ao atualizar agendamento:", error);
 
     return NextResponse.json(
-      { success: false, message: "Erro interno do servidor" },
+      {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Erro interno do servidor",
+      },
       { status: 500 }
     );
   }
+} // ✅ FECHOU O PATCH AQUI
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: Params
+) {
+  try {
+    const service = new BookingService(
+      new BookingRepository()
+    );
+
+    await service.cancelBooking(params.id);
+
+    return NextResponse.json({
+      success: true,
+      message: "Agendamento cancelado com sucesso",
+    });
+  } catch (error) {
+    console.error("Erro no cancelamento:", error);
+    return handleError(error);
+  }
+}
+
+function handleError(error: unknown) {
+  if (error instanceof AppError) {
+    return NextResponse.json(
+      { success: false, message: error.message },
+      { status: error.statusCode }
+    );
+  }
+
+  return NextResponse.json(
+    { success: false, message: "Erro interno do servidor" },
+    { status: 500 }
+  );
 }

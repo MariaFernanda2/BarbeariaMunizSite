@@ -19,16 +19,37 @@ export const authOptions: AuthOptions = {
 
   callbacks: {
     async jwt({ token, user }) {
-      if (user) {
-        token.sub = user.id;
+      if (user?.id) {
+        token.id = user.id;
       }
+
+      if (token.email) {
+        const dbUser = await db.user.findUnique({
+          where: { email: token.email },
+          include: {
+            barber: true,
+          },
+        });
+
+        if (dbUser) {
+          token.id = dbUser.id;
+          token.role = dbUser.role;
+          token.barbershopId = dbUser.barber?.barbershopId ?? undefined;
+          token.barberId = dbUser.barber?.id ?? undefined;
+        }
+      }
+
       return token;
     },
 
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.sub as string;
+        session.user.id = token.id as string;
+        session.user.role = token.role as string;
+        session.user.barbershopId = token.barbershopId as string | undefined;
+        session.user.barberId = token.barberId as string | undefined;
       }
+
       return session;
     },
   },

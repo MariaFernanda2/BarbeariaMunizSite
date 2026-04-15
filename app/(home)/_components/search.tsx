@@ -1,12 +1,17 @@
 "use client";
 
 import { Button } from "@/app/_components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormMessage } from "@/app/_components/ui/form";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormMessage,
+} from "@/app/_components/ui/form";
 import { Input } from "@/app/_components/ui/input";
 import { SearchIcon } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-
 import { z } from "zod";
 import { useRouter } from "next/navigation";
 
@@ -32,20 +37,36 @@ const Search = ({ defaultValues }: SearchProps) => {
   });
 
   const handleSubmit = (data: z.infer<typeof formSchema>) => {
-    router.push(`/barbershops?search=${data.search}`);
+    try {
+      // 🔥 remove caracteres problemáticos (opcional)
+      const sanitized = data.search.replace(/[^\w\sÀ-ÿ]/g, "");
+
+      // 🔥 encode para URL (ESSENCIAL)
+      const encoded = encodeURIComponent(sanitized);
+
+      router.push(`/barbershops?search=${encoded}`);
+    } catch (error) {
+      console.error("Erro ao processar busca:", error);
+    }
   };
 
   return (
     <div className="flex items-center gap-2">
       <Form {...form}>
-        <form className="flex w-full gap-4" onSubmit={form.handleSubmit(handleSubmit)}>
+        <form
+          className="flex w-full gap-4"
+          onSubmit={form.handleSubmit(handleSubmit)}
+        >
           <FormField
             control={form.control}
             name="search"
             render={({ field }) => (
               <FormItem className="w-full">
                 <FormControl>
-                  <Input placeholder="Busque por uma barbearia..." {...field} />
+                  <Input
+                    placeholder="Busque por uma barbearia..."
+                    {...field}
+                  />
                 </FormControl>
 
                 <FormMessage />
