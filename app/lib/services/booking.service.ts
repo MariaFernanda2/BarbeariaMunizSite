@@ -39,6 +39,10 @@ export class BookingService {
       throw new AppError("Informe o cliente.", 400);
     }
 
+    if (data.clientName && !data.clientPhone) {
+      throw new AppError("Informe o WhatsApp do cliente.", 400);
+    }
+
     const barber = await db.barber.findUnique({
       where: { id: data.barberId },
     });
@@ -65,8 +69,9 @@ export class BookingService {
 
     const existingBooking = await this.bookingRepository.findByDateAndBarber(
       bookingDate,
-      data.barberId,
+      data.barberId
     );
+
     if (existingBooking) {
       throw new AppError("Horário já está reservado.", 409);
     }
@@ -85,10 +90,6 @@ export class BookingService {
 
     if (conflictingBlock) {
       throw new AppError("A agenda está bloqueada nesse horário.", 409);
-    }
-
-    if (existingBooking) {
-      throw new AppError("Horário já está reservado.", 409);
     }
 
     let finalUserId = data.userId;
@@ -116,6 +117,8 @@ export class BookingService {
       barberId: data.barberId,
       barbershopId: data.barbershopId,
       date: bookingDate,
+      clientName: data.clientName,
+      clientPhone: data.clientPhone,
     });
 
     return this.mapToResponse(booking);
@@ -131,7 +134,7 @@ export class BookingService {
     if (new Date(booking.date) <= new Date()) {
       throw new AppError(
         "Não é possível cancelar reserva finalizada ou em andamento.",
-        400,
+        400
       );
     }
 
