@@ -1,6 +1,7 @@
 export interface BookingResponseDTO {
   id: string;
   date: string;
+  endDate: string;
   status: "CONFIRMED" | "COMPLETED" | "CANCELED";
 
   clientName?: string;

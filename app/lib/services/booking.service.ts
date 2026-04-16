@@ -1,9 +1,12 @@
+import { BookingStatus } from "@prisma/client";
+
 import { CreateBookingDTO } from "../dtos/create-booking.dto";
 import { BookingRepository } from "../repositories/booking.repository";
 import { AppError } from "../errors/app-error";
 import { BookingResponseDTO } from "../dtos/booking-response.dto";
 import { UpdateBookingDTO } from "../dtos/update-booking.dto";
 import { db } from "../repositories/prisma";
+import { buildBookingEndDate } from "../utils/booking-time";
 
 export class BookingService {
   private bookingRepository: BookingRepository;
@@ -67,20 +70,41 @@ export class BookingService {
       throw new AppError("O serviço não pertence a essa unidade.", 400);
     }
 
-    const existingBooking = await this.bookingRepository.findByDateAndBarber(
+    const bookingEndDate = buildBookingEndDate(
       bookingDate,
-      data.barberId
+      service.durationInMinutes
     );
 
-    if (existingBooking) {
-      throw new AppError("Horário já está reservado.", 409);
+    const conflictingBooking = await db.booking.findFirst({
+      where: {
+        barberId: data.barberId,
+        status: {
+          in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED],
+        },
+        date: {
+          lt: bookingEndDate,
+        },
+        endDate: {
+          gt: bookingDate,
+        },
+      },
+      include: {
+        service: true,
+      },
+    });
+
+    if (conflictingBooking) {
+      throw new AppError(
+        "Já existe um agendamento em andamento nesse intervalo.",
+        409
+      );
     }
 
     const conflictingBlock = await db.scheduleBlock.findFirst({
       where: {
         barberId: data.barberId,
         startDate: {
-          lte: bookingDate,
+          lt: bookingEndDate,
         },
         endDate: {
           gt: bookingDate,
@@ -89,7 +113,7 @@ export class BookingService {
     });
 
     if (conflictingBlock) {
-      throw new AppError("A agenda está bloqueada nesse horário.", 409);
+      throw new AppError("A agenda está bloqueada nesse intervalo.", 409);
     }
 
     let finalUserId = data.userId;
@@ -117,6 +141,7 @@ export class BookingService {
       barberId: data.barberId,
       barbershopId: data.barbershopId,
       date: bookingDate,
+      endDate: bookingEndDate,
       clientName: data.clientName,
       clientPhone: data.clientPhone,
     });
@@ -162,24 +187,93 @@ export class BookingService {
       throw new AppError("Nenhum dado enviado para atualização", 400);
     }
 
+    const existingBooking = await this.bookingRepository.findById(id);
+
+    if (!existingBooking) {
+      throw new AppError("Reserva não encontrada.", 404);
+    }
+
+    let nextDate = existingBooking.date;
+    let nextEndDate = existingBooking.endDate;
+    let nextStatus = data.status ?? existingBooking.status;
+
     if (data.date) {
       const parsedDate = new Date(data.date);
 
       if (isNaN(parsedDate.getTime())) {
         throw new AppError("Data inválida", 400);
       }
+
+      if (parsedDate <= new Date()) {
+        throw new AppError("A data da reserva deve ser futura.", 400);
+      }
+
+      const service = await db.service.findUnique({
+        where: { id: existingBooking.serviceId },
+      });
+
+      if (!service) {
+        throw new AppError("Serviço não encontrado.", 404);
+      }
+
+      const recalculatedEndDate = buildBookingEndDate(
+        parsedDate,
+        service.durationInMinutes
+      );
+
+      const conflictingBooking = await db.booking.findFirst({
+        where: {
+          id: { not: id },
+          barberId: existingBooking.barberId,
+          status: {
+            in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED],
+          },
+          date: {
+            lt: recalculatedEndDate,
+          },
+          endDate: {
+            gt: parsedDate,
+          },
+        },
+      });
+
+      if (conflictingBooking) {
+        throw new AppError("Já existe outro agendamento nesse intervalo.", 409);
+      }
+
+      const conflictingBlock = await db.scheduleBlock.findFirst({
+        where: {
+          barberId: existingBooking.barberId,
+          startDate: {
+            lt: recalculatedEndDate,
+          },
+          endDate: {
+            gt: parsedDate,
+          },
+        },
+      });
+
+      if (conflictingBlock) {
+        throw new AppError("A agenda está bloqueada nesse intervalo.", 409);
+      }
+
+      nextDate = parsedDate;
+      nextEndDate = recalculatedEndDate;
     }
 
-    return await this.bookingRepository.update(id, {
-      ...(data.date && { date: new Date(data.date) }),
-      ...(data.status && { status: data.status }),
+    const updated = await this.bookingRepository.update(id, {
+      ...(data.date && { date: nextDate, endDate: nextEndDate }),
+      ...(data.status && { status: nextStatus }),
     });
+
+    return this.mapToResponse(updated);
   }
 
   private mapToResponse(booking: any): BookingResponseDTO {
     return {
       id: booking.id,
       date: booking.date.toISOString(),
+      endDate: booking.endDate?.toISOString(),
       status: booking.status,
       service: {
         id: booking.service.id,

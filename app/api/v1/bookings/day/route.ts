@@ -28,9 +28,18 @@ export async function GET(request: NextRequest) {
           lte: endOfDay(date),
         },
       },
+      select: {
+        id: true,
+        date: true,
+        endDate: true,
+        status: true,
+        barberId: true,
+      },
+      orderBy: {
+        date: "asc",
+      },
     });
 
-    // 🔥 IMPORTANTE: retornar array direto
     return NextResponse.json(bookings);
   } catch (error) {
     console.error("DAY BOOKINGS ERROR:", error);

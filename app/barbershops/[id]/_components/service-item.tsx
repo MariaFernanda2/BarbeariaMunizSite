@@ -17,12 +17,11 @@ import {
   formatBookingInAppTimeZone,
 } from "@/app/lib/utils/timezone";
 
-import { Barbershop, Booking, Service, Barber } from "@prisma/client";
+import { Barbershop, Service, Barber } from "@prisma/client";
 import { ptBR } from "date-fns/locale";
 import { signIn, useSession } from "next-auth/react";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import { generateDayTimeList } from "../_helpers/hours";
 import { addDays } from "date-fns";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -34,35 +33,77 @@ interface BarbershopWithBarbers extends Barbershop {
 
 interface ServiceItemProps {
   barbershop: BarbershopWithBarbers;
-  service: Service;
+  service: Service & {
+    durationInMinutes?: number;
+  };
 }
+
+type DayBooking = {
+  id: string;
+  date: string | Date;
+  endDate: string | Date;
+  status: "CONFIRMED" | "COMPLETED" | "CANCELED";
+  barberId: string;
+};
+
+type DayBlock = {
+  id: string;
+  barberId: string;
+  startDate: string | Date;
+  endDate: string | Date;
+  reason?: string | null;
+};
 
 type SuccessModalState = {
   open: boolean;
   bookingDate: Date;
+  bookingEndDate: Date;
   barberName: string;
 } | null;
+
+const START_HOUR = 8;
+const END_HOUR = 20;
+const SLOT_INTERVAL_MINUTES = 10;
 
 function getAppDayKey(date: Date | string) {
   return formatBookingInAppTimeZone(date, "yyyy-MM-dd", APP_TIME_ZONE);
 }
 
-function getAppTimeKey(date: Date | string) {
-  return formatBookingInAppTimeZone(date, "HH:mm", APP_TIME_ZONE);
-}
-
 function formatPhone(value: string) {
   const digits = value.replace(/\D/g, "").slice(0, 11);
 
-  if (digits.length <= 2) {
-    return digits;
-  }
-
+  if (digits.length <= 2) return digits;
   if (digits.length <= 7) {
     return digits.replace(/^(\d{2})(\d+)/, "($1) $2");
   }
 
   return digits.replace(/^(\d{2})(\d{5})(\d+)/, "($1) $2-$3");
+}
+
+function hasTimeOverlap(
+  startA: Date,
+  endA: Date,
+  startB: Date,
+  endB: Date
+) {
+  return startA < endB && endA > startB;
+}
+
+function generateDayTimeList(date: Date) {
+  const list: string[] = [];
+  const current = new Date(date);
+
+  current.setHours(START_HOUR, 0, 0, 0);
+
+  const end = new Date(date);
+  end.setHours(END_HOUR, 0, 0, 0);
+
+  while (current <= end) {
+    list.push(formatBookingInAppTimeZone(current, "HH:mm", APP_TIME_ZONE));
+    current.setMinutes(current.getMinutes() + SLOT_INTERVAL_MINUTES);
+  }
+
+  return list;
 }
 
 const ServiceItem = ({ service, barbershop }: ServiceItemProps) => {
@@ -78,40 +119,67 @@ const ServiceItem = ({ service, barbershop }: ServiceItemProps) => {
 
   const [submitIsLoading, setSubmitIsLoading] = useState(false);
   const [sheetIsOpen, setSheetIsOpen] = useState(false);
-  const [dayBookings, setDayBookings] = useState<Booking[]>([]);
+
+  const [dayBookings, setDayBookings] = useState<DayBooking[]>([]);
+  const [dayBlocks, setDayBlocks] = useState<DayBlock[]>([]);
+
   const [successModal, setSuccessModal] = useState<SuccessModalState>(null);
+
+  const durationInMinutes = service.durationInMinutes ?? 30;
 
   useEffect(() => {
     if (!date) {
       setDayBookings([]);
+      setDayBlocks([]);
       return;
     }
 
-    const fetchDayBookings = async () => {
+    const fetchDayData = async () => {
       try {
         const dayKey = getAppDayKey(date);
 
-        const response = await fetch(
-          `/api/v1/bookings/day?barbershopId=${barbershop.id}&date=${encodeURIComponent(
-            dayKey
-          )}&timeZone=${encodeURIComponent(APP_TIME_ZONE)}`
-        );
+        const [bookingsResponse, blocksResponse] = await Promise.all([
+          fetch(
+            `/api/v1/bookings/day?barbershopId=${barbershop.id}&date=${encodeURIComponent(
+              dayKey
+            )}&timeZone=${encodeURIComponent(APP_TIME_ZONE)}`
+          ),
+          fetch(
+            `/api/v1/schedule-blocks/day?barbershopId=${barbershop.id}&date=${encodeURIComponent(
+              dayKey
+            )}&timeZone=${encodeURIComponent(APP_TIME_ZONE)}`
+          ),
+        ]);
 
-        if (!response.ok) {
+        if (!bookingsResponse.ok) {
           throw new Error("Erro ao buscar agendamentos do dia.");
         }
 
-        const result = await response.json();
-        const bookings = Array.isArray(result) ? result : result?.data ?? [];
+        if (!blocksResponse.ok) {
+          throw new Error("Erro ao buscar bloqueios do dia.");
+        }
+
+        const bookingsResult = await bookingsResponse.json();
+        const blocksResult = await blocksResponse.json();
+
+        const bookings = Array.isArray(bookingsResult)
+          ? bookingsResult
+          : bookingsResult?.data ?? [];
+
+        const blocks = Array.isArray(blocksResult)
+          ? blocksResult
+          : blocksResult?.data ?? [];
 
         setDayBookings(bookings);
+        setDayBlocks(blocks);
       } catch (error) {
         console.error(error);
         setDayBookings([]);
+        setDayBlocks([]);
       }
     };
 
-    fetchDayBookings();
+    fetchDayData();
   }, [date, barbershop.id]);
 
   const handleBookingClick = async () => {
@@ -153,6 +221,10 @@ const ServiceItem = ({ service, barbershop }: ServiceItemProps) => {
         APP_TIME_ZONE
       );
 
+      const bookingEndDateUtc = new Date(
+        bookingDateUtc.getTime() + durationInMinutes * 60 * 1000
+      );
+
       const selectedBarber = barbershop.barbers.find(
         (barber) => barber.id === barberId
       );
@@ -184,10 +256,12 @@ const ServiceItem = ({ service, barbershop }: ServiceItemProps) => {
       setClientName("");
       setClientPhone("");
       setDayBookings([]);
+      setDayBlocks([]);
 
       setSuccessModal({
         open: true,
         bookingDate: bookingDateUtc,
+        bookingEndDate: bookingEndDateUtc,
         barberName: selectedBarber?.name || "Barbeiro",
       });
     } catch (error: any) {
@@ -201,28 +275,71 @@ const ServiceItem = ({ service, barbershop }: ServiceItemProps) => {
   const timeList = useMemo(() => {
     if (!date || !barberId) return [];
 
+    const now = new Date();
     const selectedDayKey = getAppDayKey(date);
 
     return generateDayTimeList(date).filter((time) => {
-      return !dayBookings.some((booking) => {
-        const bookingDayKey = getAppDayKey(booking.date);
-        const bookingTimeKey = getAppTimeKey(booking.date);
+      const slotStart = buildUtcDateFromLocalSelection(
+        date,
+        time,
+        APP_TIME_ZONE
+      );
 
-        return (
-          booking.barberId === barberId &&
-          booking.status !== "CANCELED" &&
-          bookingDayKey === selectedDayKey &&
-          bookingTimeKey === time
-        );
+      const slotEnd = new Date(
+        slotStart.getTime() + durationInMinutes * 60 * 1000
+      );
+
+      const hasBookingConflict = dayBookings.some((booking) => {
+        if (booking.barberId !== barberId) return false;
+        if (booking.status === "CANCELED") return false;
+        if (getAppDayKey(booking.date) !== selectedDayKey) return false;
+
+        const bookingStart = new Date(booking.date);
+        const bookingEnd = new Date(booking.endDate);
+
+        return hasTimeOverlap(slotStart, slotEnd, bookingStart, bookingEnd);
       });
+
+      if (hasBookingConflict) return false;
+
+      const hasBlockConflict = dayBlocks.some((block) => {
+        if (block.barberId !== barberId) return false;
+
+        const blockStart = new Date(block.startDate);
+        const blockEnd = new Date(block.endDate);
+
+        return hasTimeOverlap(slotStart, slotEnd, blockStart, blockEnd);
+      });
+
+      if (hasBlockConflict) return false;
+
+      const slotEndHour = Number(
+        formatBookingInAppTimeZone(slotEnd, "H", APP_TIME_ZONE)
+      );
+      const slotEndMinute = Number(
+        formatBookingInAppTimeZone(slotEnd, "m", APP_TIME_ZONE)
+      );
+
+      if (slotEndHour > END_HOUR) return false;
+      if (slotEndHour === END_HOUR && slotEndMinute > 0) return false;
+
+      if (slotStart <= now) return false;
+
+      return true;
     });
-  }, [date, barberId, dayBookings]);
+  }, [date, barberId, dayBookings, dayBlocks, durationInMinutes]);
 
   const previewDate = useMemo(() => {
     if (!date || !hour) return undefined;
 
     return buildUtcDateFromLocalSelection(date, hour, APP_TIME_ZONE);
   }, [date, hour]);
+
+  const previewEndDate = useMemo(() => {
+    if (!previewDate) return undefined;
+
+    return new Date(previewDate.getTime() + durationInMinutes * 60 * 1000);
+  }, [previewDate, durationInMinutes]);
 
   return (
     <>
@@ -241,7 +358,10 @@ const ServiceItem = ({ service, barbershop }: ServiceItemProps) => {
 
             <div className="flex w-full flex-col">
               <h2 className="font-bold">{service.name}</h2>
-              <p className="text-sm text-gray-400">{service.description}</p>
+              <p className="text-sm text-gray-400">
+                {service.description}
+                {durationInMinutes ? ` • ${durationInMinutes} min` : ""}
+              </p>
 
               <div className="mt-3 flex items-center justify-between">
                 <p className="text-premium text-sm font-bold">
@@ -337,7 +457,9 @@ const ServiceItem = ({ service, barbershop }: ServiceItemProps) => {
             </div>
 
             <div className="space-y-4 border-b border-secondary px-5 py-6">
-              <p className="text-sm text-zinc-400">Selecione o dia e o horário.</p>
+              <p className="text-sm text-zinc-400">
+                Selecione o dia e o horário.
+              </p>
 
               <div className="rounded-3xl border border-premium bg-premium-soft/40 p-2">
                 <Calendar
@@ -354,27 +476,38 @@ const ServiceItem = ({ service, barbershop }: ServiceItemProps) => {
             </div>
 
             {date && barberId && (
-              <div className="flex gap-3 overflow-x-auto border-t border-secondary px-5 py-6">
-                {timeList.length > 0 ? (
-                  timeList.map((time) => (
-                    <Button
-                      key={time}
-                      onClick={() => setHour(time)}
-                      variant="outline"
-                      className={`rounded-full ${
-                        hour === time
-                          ? "premium-button border-transparent"
-                          : "border-zinc-700 bg-transparent text-white hover:border-primary hover:bg-premium-soft"
-                      }`}
-                    >
-                      {time}
-                    </Button>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Nenhum horário disponível para este barbeiro nesta data.
+              <div className="space-y-3 border-t border-secondary px-5 py-6">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium text-white">
+                    Horários disponíveis
                   </p>
-                )}
+                  <p className="text-xs text-zinc-400">
+                    Serviço com duração de {durationInMinutes} min
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  {timeList.length > 0 ? (
+                    timeList.map((time) => (
+                      <Button
+                        key={time}
+                        onClick={() => setHour(time)}
+                        variant="outline"
+                        className={`rounded-full ${
+                          hour === time
+                            ? "premium-button border-transparent"
+                            : "border-zinc-700 bg-transparent text-white hover:border-primary hover:bg-premium-soft"
+                        }`}
+                      >
+                        {time}
+                      </Button>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Nenhum horário disponível para este barbeiro nesta data.
+                    </p>
+                  )}
+                </div>
               </div>
             )}
 
@@ -389,6 +522,27 @@ const ServiceItem = ({ service, barbershop }: ServiceItemProps) => {
                   date: previewDate,
                 }}
               />
+
+              {previewDate && previewEndDate ? (
+                <div className="mt-4 rounded-2xl border border-premium bg-premium-soft/30 p-4">
+                  <p className="text-xs uppercase tracking-wide text-zinc-400">
+                    Previsão do atendimento
+                  </p>
+                  <p className="mt-1 font-semibold text-white">
+                    {formatBookingInAppTimeZone(
+                      previewDate,
+                      "dd/MM/yyyy 'às' HH:mm",
+                      APP_TIME_ZONE
+                    )}{" "}
+                    até{" "}
+                    {formatBookingInAppTimeZone(
+                      previewEndDate,
+                      "HH:mm",
+                      APP_TIME_ZONE
+                    )}
+                  </p>
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -432,7 +586,9 @@ const ServiceItem = ({ service, barbershop }: ServiceItemProps) => {
                 <p className="text-xs uppercase tracking-wide text-zinc-400">
                   Serviço
                 </p>
-                <p className="font-semibold text-white">{service.name}</p>
+                <p className="font-semibold text-white">
+                  {service.name} • {durationInMinutes} min
+                </p>
               </div>
 
               <div>
@@ -452,6 +608,12 @@ const ServiceItem = ({ service, barbershop }: ServiceItemProps) => {
                   {formatBookingInAppTimeZone(
                     successModal.bookingDate,
                     "dd/MM/yyyy 'às' HH:mm",
+                    APP_TIME_ZONE
+                  )}{" "}
+                  até{" "}
+                  {formatBookingInAppTimeZone(
+                    successModal.bookingEndDate,
+                    "HH:mm",
                     APP_TIME_ZONE
                   )}
                 </p>

@@ -205,7 +205,7 @@ const topService =
     {
       title: "Relatórios",
       description: "Acompanhe seus números, desempenho e evolução no período.",
-      href: "",
+      href: "/dashboard/metricas",
       cta: "Ver relatórios",
       icon: BarChart3,
       tone: "secondary",
