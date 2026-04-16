@@ -36,14 +36,15 @@ model Barbershop {
 }
 
 model Service {
-  id           String     @id @default(uuid())
-  name         String
-  price        Decimal    @db.Decimal(10, 2)
-  barbershopId String
-  description  String
-  imageUrl     String
-  barbershop   Barbershop @relation(fields: [barbershopId], references: [id])
-  bookings     Booking[]
+  id                String     @id @default(uuid())
+  name              String
+  price             Decimal    @db.Decimal(10, 2)
+  durationInMinutes Int        @default(30)
+  barbershopId      String
+  description       String
+  imageUrl          String
+  barbershop        Barbershop @relation(fields: [barbershopId], references: [id])
+  bookings          Booking[]
 }
 
 model Barber {
@@ -66,6 +67,7 @@ model Booking {
   barberId     String
   barbershopId String
   date         DateTime
+  endDate      DateTime
   status       BookingStatus  @default(CONFIRMED)
   clientName   String?
   clientPhone  String?
@@ -74,6 +76,8 @@ model Booking {
   service      Service        @relation(fields: [serviceId], references: [id])
   user         User           @relation(fields: [userId], references: [id])
   review       BookingReview?
+
+  @@index([barberId, date, endDate])
 }
 
 model Account {
