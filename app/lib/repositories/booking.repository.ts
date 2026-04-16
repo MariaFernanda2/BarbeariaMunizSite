@@ -7,6 +7,7 @@ export class BookingRepository {
     barberId: string;
     barbershopId: string;
     date: Date;
+    endDate: Date;
     clientName?: string;
     clientPhone?: string;
   }) {
@@ -17,6 +18,7 @@ export class BookingRepository {
         barberId: data.barberId,
         barbershopId: data.barbershopId,
         date: data.date,
+        endDate: data.endDate,
         clientName: data.clientName,
         clientPhone: data.clientPhone,
         status: "CONFIRMED",
@@ -38,6 +40,47 @@ export class BookingRepository {
         status: {
           not: "CANCELED",
         },
+      },
+      include: {
+        service: true,
+        barbershop: true,
+        barber: true,
+        user: true,
+      },
+    });
+  }
+
+  async findConflictingBooking(params: {
+    barberId: string;
+    startDate: Date;
+    endDate: Date;
+    excludeBookingId?: string;
+  }) {
+    return db.booking.findFirst({
+      where: {
+        barberId: params.barberId,
+        ...(params.excludeBookingId
+          ? {
+              id: {
+                not: params.excludeBookingId,
+              },
+            }
+          : {}),
+        status: {
+          in: ["CONFIRMED", "COMPLETED"],
+        },
+        date: {
+          lt: params.endDate,
+        },
+        endDate: {
+          gt: params.startDate,
+        },
+      },
+      include: {
+        service: true,
+        barbershop: true,
+        barber: true,
+        user: true,
       },
     });
   }
@@ -73,6 +116,7 @@ export class BookingRepository {
     id: string,
     data: {
       date?: Date;
+      endDate?: Date;
       status?: "CONFIRMED" | "COMPLETED" | "CANCELED";
     }
   ) {

@@ -95,12 +95,6 @@ export default async function DashboardBarbershopPage({
               </p>
             </div>
 
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-right">
-              <p className="text-xs text-zinc-400">Barbeiros da unidade</p>
-              <p className="text-lg font-semibold">
-                {barbershop.barbers.length}
-              </p>
-            </div>
           </div>
         </div>
       </div>
