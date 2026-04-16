@@ -146,8 +146,8 @@ function aggregateMetrics(
   let topService = "-";
   let topServiceBookings = 0;
 
-  for (const [serviceName, count] of topServiceMap.entries()) {
-    if (count > topServiceBookings) {
+for (const [serviceName, count] of Array.from(topServiceMap.entries())) {
+      if (count > topServiceBookings) {
       topService = serviceName;
       topServiceBookings = count;
     }
