@@ -57,19 +57,19 @@ type ScheduleBlock = {
 
 type CalendarEvent =
   | {
-      id: string;
-      type: "booking";
-      data: Booking;
-      start: Date;
-      end: Date;
-    }
+    id: string;
+    type: "booking";
+    data: Booking;
+    start: Date;
+    end: Date;
+  }
   | {
-      id: string;
-      type: "block";
-      data: ScheduleBlock;
-      start: Date;
-      end: Date;
-    };
+    id: string;
+    type: "block";
+    data: ScheduleBlock;
+    start: Date;
+    end: Date;
+  };
 
 type EventWithLayout = CalendarEvent & {
   lane: number;
@@ -378,6 +378,7 @@ export default function BarbershopCalendar({
   currentBarberId,
   defaultOpenCreateBooking = false,
 }: Props) {
+  const [isQuickClient, setIsQuickClient] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [openActionMenuBarberId, setOpenActionMenuBarberId] = useState<string | null>(null);
 
@@ -519,8 +520,8 @@ export default function BarbershopCalendar({
   async function handleCreateBooking(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!clientName.trim() || !clientPhone.trim()) {
-      alert("Informe o nome e o WhatsApp do cliente.");
+    if (!clientName.trim()) {
+      alert("Informe o nome do cliente.");
       return;
     }
 
@@ -1072,6 +1073,31 @@ export default function BarbershopCalendar({
                 />
               </div>
 
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={isQuickClient}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setIsQuickClient(checked);
+
+                    if (checked) {
+                      setClientName("Cliente balcão");
+                      setClientPhone("");
+                    } else {
+                      setClientName("");
+                    }
+                  }}
+                />
+
+                <label
+                  htmlFor="clienteRapido"
+                  className="text-sm text-zinc-400 cursor-pointer"
+                >
+                  Cliente rápido (balcão)
+                </label>
+              </div>
+
               <div>
                 <label className="mb-2 block text-sm font-medium text-zinc-200">
                   WhatsApp
@@ -1082,36 +1108,35 @@ export default function BarbershopCalendar({
                   placeholder="(11) 99999-9999"
                   className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-zinc-500 outline-none transition focus:border-[hsl(43_96%_56%_/_0.45)]"
                   inputMode="numeric"
-                  required
                 />
               </div>
 
-<div>
-  <label className="mb-2 block text-sm font-medium text-zinc-200">
-    Serviço
-  </label>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-zinc-200">
+                  Serviço
+                </label>
 
-  <Select value={serviceId} onValueChange={setServiceId} required>
-    <SelectTrigger className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none transition focus:border-[hsl(43_96%_56%_/_0.45)]">
-      <SelectValue placeholder="Selecione um serviço" />
-    </SelectTrigger>
+                <Select value={serviceId} onValueChange={setServiceId} required>
+                  <SelectTrigger className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none transition focus:border-[hsl(43_96%_56%_/_0.45)]">
+                    <SelectValue placeholder="Selecione um serviço" />
+                  </SelectTrigger>
 
-    <SelectContent className="border-white/10 bg-zinc-950 text-white">
-      {services.map((service) => (
-        <SelectItem
-          key={service.id}
-          value={service.id}
-          className="text-white focus:bg-white/10 focus:text-white"
-        >
-          {service.name} — R$ {Number(service.price).toFixed(2)}
-          {service.durationInMinutes
-            ? ` • ${service.durationInMinutes} min`
-            : ""}
-        </SelectItem>
-      ))}
-    </SelectContent>
-  </Select>
-</div>
+                  <SelectContent className="border-white/10 bg-zinc-950 text-white">
+                    {services.map((service) => (
+                      <SelectItem
+                        key={service.id}
+                        value={service.id}
+                        className="text-white focus:bg-white/10 focus:text-white"
+                      >
+                        {service.name} — R$ {Number(service.price).toFixed(2)}
+                        {service.durationInMinutes
+                          ? ` • ${service.durationInMinutes} min`
+                          : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-zinc-200">
