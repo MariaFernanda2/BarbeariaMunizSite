@@ -8,6 +8,14 @@ import { UpdateBookingDTO } from "../dtos/update-booking.dto";
 import { db } from "../repositories/prisma";
 import { buildBookingEndDate } from "../utils/booking-time";
 
+interface CreateBookingOptions {
+  allowPastDate?: boolean;
+}
+
+interface UpdateBookingOptions {
+  allowPastDate?: boolean;
+}
+
 export class BookingService {
   private bookingRepository: BookingRepository;
 
@@ -15,14 +23,18 @@ export class BookingService {
     this.bookingRepository = bookingRepository || new BookingRepository();
   }
 
-  async create(data: CreateBookingDTO): Promise<BookingResponseDTO> {
+  async create(
+    data: CreateBookingDTO,
+    options?: CreateBookingOptions
+  ): Promise<BookingResponseDTO> {
     const bookingDate = new Date(data.date);
+    const allowPastDate = options?.allowPastDate ?? false;
 
     if (isNaN(bookingDate.getTime())) {
       throw new AppError("Data inválida.", 400);
     }
 
-    if (bookingDate <= new Date()) {
+    if (!allowPastDate && bookingDate <= new Date()) {
       throw new AppError("A data da reserva deve ser futura.", 400);
     }
 
@@ -40,10 +52,6 @@ export class BookingService {
 
     if (!data.userId && !data.clientName) {
       throw new AppError("Informe o cliente.", 400);
-    }
-
-    if (data.clientName && !data.clientPhone) {
-      throw new AppError("Informe o WhatsApp do cliente.", 400);
     }
 
     const barber = await db.barber.findUnique({
@@ -182,7 +190,13 @@ export class BookingService {
     return this.mapToResponse(booking);
   }
 
-  async updateBooking(id: string, data: UpdateBookingDTO) {
+  async updateBooking(
+    id: string,
+    data: UpdateBookingDTO,
+    options?: UpdateBookingOptions
+  ) {
+    const allowPastDate = options?.allowPastDate ?? false;
+
     if (!data.date && !data.status) {
       throw new AppError("Nenhum dado enviado para atualização", 400);
     }
@@ -204,7 +218,7 @@ export class BookingService {
         throw new AppError("Data inválida", 400);
       }
 
-      if (parsedDate <= new Date()) {
+      if (!allowPastDate && parsedDate <= new Date()) {
         throw new AppError("A data da reserva deve ser futura.", 400);
       }
 
