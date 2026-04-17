@@ -162,7 +162,11 @@ export async function POST(request: NextRequest) {
     }
 
     const bookingService = new BookingService();
-    const booking = await bookingService.create(bookingPayload);
+    const allowPastDate = role === "BARBER" || role === "ADMIN";
+
+    const booking = await bookingService.create(bookingPayload, {
+      allowPastDate,
+    });
 
     return NextResponse.json(
       { success: true, data: booking },
