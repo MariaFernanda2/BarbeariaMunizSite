@@ -62,7 +62,7 @@ type SuccessModalState = {
 } | null;
 
 const START_HOUR = 8;
-const END_HOUR = 20;
+const END_HOUR = 22;
 const SLOT_INTERVAL_MINUTES = 10;
 
 function getAppDayKey(date: Date | string) {
