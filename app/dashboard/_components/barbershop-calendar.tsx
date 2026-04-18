@@ -94,7 +94,7 @@ interface Props {
 }
 
 const START_HOUR = 8;
-const END_HOUR = 20;
+const END_HOUR = 22;
 const HOUR_HEIGHT = 88;
 const MIN_EVENT_HEIGHT = 44;
 const DESKTOP_COLUMN_MIN_WIDTH = 300;
