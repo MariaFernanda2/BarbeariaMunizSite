@@ -1,8 +1,8 @@
 import { setHours, setMinutes, format, addMinutes } from "date-fns";
 
 export function generateDayTimeList(date: Date): string[] {
-  const startTime = setMinutes(setHours(date, 9), 0); // Set start time to 09:00
-  const endTime = setMinutes(setHours(date, 20), 0); // Set end time to 21:00
+  const startTime = setMinutes(setHours(date, 8), 0); // Set start time to 08:00
+  const endTime = setMinutes(setHours(date, 22), 0); // Set end time to 22:00
   const interval = 60; // interval in minutes
   const timeList: string[] = [];
 
