@@ -6,4 +6,6 @@ export interface CreateBookingDTO {
   date: string | Date;
   clientName?: string;
   clientPhone?: string;
+  paymentMethod?: "CARD" | "CASH" | "PIX" | null;
+  finalPrice?: number | null;
 }

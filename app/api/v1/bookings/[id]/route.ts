@@ -31,20 +31,19 @@ export async function GET(
   }
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: Params
-) {
+export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const body = await request.json();
 
-    const service = new BookingService(
-      new BookingRepository()
-    );
+    const service = new BookingService(new BookingRepository());
 
     const updatedBooking = await service.updateBooking(params.id, {
       date: body.date,
       status: body.status,
+      clientName: body.clientName,
+      clientPhone: body.clientPhone,
+      paymentMethod: body.paymentMethod,
+      finalPrice: body.finalPrice,
     });
 
     return NextResponse.json({
@@ -53,18 +52,7 @@ export async function PATCH(
       data: updatedBooking,
     });
   } catch (error) {
-    console.error("Erro ao atualizar agendamento:", error);
-
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          error instanceof Error
-            ? error.message
-            : "Erro interno do servidor",
-      },
-      { status: 500 }
-    );
+    return handleError(error);
   }
 } // ✅ FECHOU O PATCH AQUI
 
