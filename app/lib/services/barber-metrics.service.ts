@@ -79,6 +79,8 @@ function aggregateMetrics(
     userId: string | null;
     clientName: string | null;
     clientPhone: string | null;
+    finalPrice: unknown;
+
     service: {
       name: string;
       price: unknown;
@@ -268,6 +270,7 @@ export async function getMetrics({
     userId: true,
     clientName: true,
     clientPhone: true,
+    finalPrice: true,
     service: {
       select: {
         name: true,
