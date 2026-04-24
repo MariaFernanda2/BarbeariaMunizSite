@@ -6,4 +6,5 @@ export interface UpdateBookingDTO {
   clientPhone?: string;
   paymentMethod?: "CARD" | "CASH" | "PIX" | null;
   finalPrice?: number | null;
+  serviceId?: string;
 }

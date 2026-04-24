@@ -44,6 +44,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       clientPhone: body.clientPhone,
       paymentMethod: body.paymentMethod,
       finalPrice: body.finalPrice,
+      serviceId: body.serviceId,
     });
 
     return NextResponse.json({

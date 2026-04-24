@@ -20,6 +20,14 @@ import {
 } from "lucide-react";
 
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/app/_components/ui/select";
+
+import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -47,23 +55,28 @@ type Booking = {
     name: string | null;
   };
   service: {
+    id: string;
     name: string;
     price: any;
   };
   clientName?: string | null;
   clientPhone?: string | null;
   paymentMethod?: PaymentMethod | null;
+  finalPrice?: number | string | null;
+  paidAt?: string | Date | null;
 };
 
 interface Props {
   booking: Booking | null;
   onClose: () => void;
   services?: Service[];
+  bookings?: Booking[];
   barbershopId?: string;
   currentBarberId?: string;
 }
 
 type BookingForm = {
+  serviceId?: string;
   clientName: string;
   clientPhone: string;
   barberName: string;
@@ -179,22 +192,24 @@ function BookingDetailsContent({
   booking,
   form,
   setForm,
+  services,
+  mostUsedServiceId,
   loading,
   errorMessage,
   onClose,
   onSave,
   onCheckout,
-  onOpenQuickCashier,
 }: {
   booking: Booking;
   form: BookingForm;
   setForm: React.Dispatch<React.SetStateAction<BookingForm>>;
+  services: Service[];
+  mostUsedServiceId: string;
   loading: boolean;
   errorMessage: string | null;
   onClose?: () => void;
   onSave: () => void;
   onCheckout: () => void;
-  onOpenQuickCashier: () => void;
 }) {
   const clientDisplayName = form.clientName || booking.user.name || "Cliente";
   const canCheckout = form.status !== "CANCELED" && !!form.paymentMethod;
@@ -292,7 +307,6 @@ Obrigado pela preferência!`;
       </div>
 
       <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4 pb-40">
-
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
@@ -343,13 +357,45 @@ Obrigado pela preferência!`;
           </Field>
 
           <Field label="Serviço" icon={<Scissors size={14} />}>
-            <input
-              value={form.serviceName}
-              onChange={(e) => updateField("serviceName", e.target.value)}
-              placeholder="Nome do serviço"
+            <Select
+              value={form.serviceId}
               disabled={loading}
-              className={inputClass}
-            />
+              onValueChange={(value) => {
+                const selected = services.find((s) => s.id === value);
+                if (!selected) return;
+
+                setForm((prev) => ({
+                  ...prev,
+                  serviceId: selected.id,
+                  serviceName: selected.name,
+                  price: String(Number(selected.price)),
+                }));
+              }}
+            >
+              <SelectTrigger className={inputClass}>
+                <SelectValue placeholder="Selecione um serviço" />
+              </SelectTrigger>
+
+              <SelectContent className="border-white/10 bg-zinc-950 text-white">
+                {services.map((service) => {
+                  const isMostUsed = service.id === mostUsedServiceId;
+
+                  return (
+                    <SelectItem
+                      key={service.id}
+                      value={service.id}
+                      className="text-white focus:bg-white/10 focus:text-white"
+                    >
+                      {service.name} — {formatCurrency(service.price)}
+                      {service.durationInMinutes
+                        ? ` • ${service.durationInMinutes} min`
+                        : ""}
+                      {isMostUsed ? " ⭐ Mais agendado" : ""}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
@@ -408,10 +454,11 @@ Obrigado pela preferência!`;
                   onClick={() =>
                     updateField("paymentMethod", item.value as PaymentMethod)
                   }
-                  className={`flex items-center justify-center gap-1.5 rounded-xl border px-2 py-2.5 text-[11px] font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${form.paymentMethod === item.value
-                    ? "border-[hsl(43_96%_56%_/_0.55)] bg-[hsl(43_96%_56%_/_0.16)] text-[hsl(43_96%_56%)]"
-                    : "border-white/10 bg-zinc-900 text-zinc-300 hover:bg-white/5"
-                    }`}
+                  className={`flex items-center justify-center gap-1.5 rounded-xl border px-2 py-2.5 text-[11px] font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                    form.paymentMethod === item.value
+                      ? "border-[hsl(43_96%_56%_/_0.55)] bg-[hsl(43_96%_56%_/_0.16)] text-[hsl(43_96%_56%)]"
+                      : "border-white/10 bg-zinc-900 text-zinc-300 hover:bg-white/5"
+                  }`}
                 >
                   {item.icon}
                   {item.label}
@@ -503,12 +550,54 @@ export default function BookingDrawer({
   booking,
   onClose,
   services = [],
+  bookings = [],
   barbershopId,
   currentBarberId,
 }: Props) {
   const safeServices = Array.isArray(services) ? services : [];
+  const safeBookings = Array.isArray(bookings) ? bookings : [];
+
+  const serviceUsageMap = useMemo(() => {
+    const map = new Map<string, number>();
+
+    safeBookings.forEach((item) => {
+      const serviceId = item.service?.id;
+
+      if (!serviceId) return;
+
+      map.set(serviceId, (map.get(serviceId) ?? 0) + 1);
+    });
+
+    return map;
+  }, [safeBookings]);
+
+  const mostUsedServiceId = useMemo(() => {
+    let mostUsedId = "";
+    let maxCount = 0;
+
+    serviceUsageMap.forEach((count, serviceId) => {
+      if (count > maxCount) {
+        mostUsedId = serviceId;
+        maxCount = count;
+      }
+    });
+
+    return mostUsedId;
+  }, [serviceUsageMap]);
+
+  const sortedServices = useMemo(() => {
+    return [...safeServices].sort((a, b) => {
+      const countA = serviceUsageMap.get(a.id) ?? 0;
+      const countB = serviceUsageMap.get(b.id) ?? 0;
+
+      if (countB !== countA) return countB - countA;
+
+      return a.name.localeCompare(b.name);
+    });
+  }, [safeServices, serviceUsageMap]);
 
   const [form, setForm] = useState<BookingForm>({
+    serviceId: "",
     clientName: "",
     clientPhone: "",
     barberName: "",
@@ -532,11 +621,12 @@ export default function BookingDrawer({
     if (!booking) return;
 
     setForm({
+      serviceId: booking.service.id,
       clientName: booking.clientName || booking.user.name || "",
       clientPhone: booking.clientPhone || "",
       barberName: booking.barber.name || "",
       serviceName: booking.service.name || "",
-      price: String(Number(booking.service.price ?? 0)),
+      price: String(Number(booking.finalPrice ?? booking.service.price ?? 0)),
       date: toLocalInputValue(booking.date),
       status: booking.status,
       paymentMethod: booking.paymentMethod || "",
@@ -546,19 +636,19 @@ export default function BookingDrawer({
   }, [booking]);
 
   useEffect(() => {
-    if (!quickServiceId && safeServices.length > 0) {
-      setQuickServiceId(safeServices[0].id);
+    if (!quickServiceId && sortedServices.length > 0) {
+      setQuickServiceId(sortedServices[0].id);
     }
-  }, [safeServices, quickServiceId]);
+  }, [sortedServices, quickServiceId]);
 
   const isOpen = useMemo(() => !!booking, [booking]);
 
   const selectedQuickService = useMemo(() => {
-    return safeServices.find((service) => service.id === quickServiceId);
-  }, [safeServices, quickServiceId]);
+    return sortedServices.find((service) => service.id === quickServiceId);
+  }, [sortedServices, quickServiceId]);
 
   function openQuickCashier() {
-    if (!safeServices.length) {
+    if (!sortedServices.length) {
       alert("Nenhum serviço disponível para atendimento rápido.");
       return;
     }
@@ -575,6 +665,7 @@ export default function BookingDrawer({
     if (!booking) return;
 
     const payload = {
+      serviceId: form.serviceId,
       clientName: form.clientName.trim(),
       clientPhone: form.clientPhone.trim() || null,
       barberName: form.barberName.trim(),
@@ -717,11 +808,12 @@ export default function BookingDrawer({
                 booking={booking}
                 form={form}
                 setForm={setForm}
+                services={sortedServices}
+                mostUsedServiceId={mostUsedServiceId}
                 loading={loading}
                 errorMessage={errorMessage}
                 onSave={handleSave}
                 onCheckout={handleCheckout}
-                onOpenQuickCashier={openQuickCashier}
               />
             ) : null}
           </SheetContent>
@@ -734,12 +826,13 @@ export default function BookingDrawer({
             booking={booking}
             form={form}
             setForm={setForm}
+            services={sortedServices}
+            mostUsedServiceId={mostUsedServiceId}
             loading={loading}
             errorMessage={errorMessage}
             onClose={onClose}
             onSave={handleSave}
             onCheckout={handleCheckout}
-            onOpenQuickCashier={openQuickCashier}
           />
         </aside>
       ) : null}
@@ -780,9 +873,13 @@ export default function BookingDrawer({
                   className={inputClass}
                   disabled={quickLoading}
                 >
-                  {safeServices.map((service) => (
+                  {sortedServices.map((service) => (
                     <option key={service.id} value={service.id}>
                       {service.name} — {formatCurrency(service.price)}
+                      {service.durationInMinutes
+                        ? ` • ${service.durationInMinutes} min`
+                        : ""}
+                      {service.id === mostUsedServiceId ? " ⭐ Mais agendado" : ""}
                     </option>
                   ))}
                 </select>
@@ -820,10 +917,11 @@ export default function BookingDrawer({
                       onClick={() =>
                         setQuickPaymentMethod(item.value as PaymentMethod)
                       }
-                      className={`flex items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${quickPaymentMethod === item.value
-                        ? "border-[hsl(43_96%_56%_/_0.55)] bg-[hsl(43_96%_56%_/_0.16)] text-[hsl(43_96%_56%)]"
-                        : "border-white/10 bg-zinc-950 text-zinc-300 hover:bg-white/5"
-                        }`}
+                      className={`flex items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                        quickPaymentMethod === item.value
+                          ? "border-[hsl(43_96%_56%_/_0.55)] bg-[hsl(43_96%_56%_/_0.16)] text-[hsl(43_96%_56%)]"
+                          : "border-white/10 bg-zinc-950 text-zinc-300 hover:bg-white/5"
+                      }`}
                     >
                       {item.icon}
                       {item.label}
