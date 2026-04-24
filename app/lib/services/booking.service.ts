@@ -96,9 +96,6 @@ export class BookingService {
           gt: bookingDate,
         },
       },
-      include: {
-        service: true,
-      },
     });
 
     if (conflictingBooking) {
@@ -143,6 +140,8 @@ export class BookingService {
       throw new AppError("Cliente inválido.", 400);
     }
 
+    const isCompleted = data.status === BookingStatus.COMPLETED;
+
     const booking = await this.bookingRepository.create({
       userId: finalUserId,
       serviceId: data.serviceId,
@@ -151,7 +150,11 @@ export class BookingService {
       date: bookingDate,
       endDate: bookingEndDate,
       clientName: data.clientName,
-      clientPhone: data.clientPhone,
+      clientPhone: data.clientPhone ?? null,
+      status: data.status ?? BookingStatus.CONFIRMED,
+      paymentMethod: data.paymentMethod ?? null,
+      finalPrice: data.finalPrice ?? Number(service.price),
+      paidAt: isCompleted ? new Date() : null,
     });
 
     return this.mapToResponse(booking);
@@ -197,10 +200,6 @@ export class BookingService {
   ) {
     const allowPastDate = options?.allowPastDate ?? false;
 
-    if (!data.date && !data.status) {
-      throw new AppError("Nenhum dado enviado para atualização", 400);
-    }
-
     const existingBooking = await this.bookingRepository.findById(id);
 
     if (!existingBooking) {
@@ -209,17 +208,13 @@ export class BookingService {
 
     let nextDate = existingBooking.date;
     let nextEndDate = existingBooking.endDate;
-    let nextStatus = data.status ?? existingBooking.status;
+    const nextStatus = data.status ?? existingBooking.status;
 
     if (data.date) {
       const parsedDate = new Date(data.date);
 
       if (isNaN(parsedDate.getTime())) {
         throw new AppError("Data inválida", 400);
-      }
-
-      if (!allowPastDate && parsedDate <= new Date()) {
-        throw new AppError("A data da reserva deve ser futura.", 400);
       }
 
       const service = await db.service.findUnique({
@@ -275,36 +270,84 @@ export class BookingService {
       nextEndDate = recalculatedEndDate;
     }
 
-    const updated = await this.bookingRepository.update(id, {
-      ...(data.date && { date: nextDate, endDate: nextEndDate }),
-      ...(data.status && { status: nextStatus }),
-    });
+    const updatePayload: any = {
+      ...(data.date && {
+        date: nextDate,
+        endDate: nextEndDate,
+      }),
+
+      ...(data.status && {
+        status: nextStatus,
+      }),
+
+      ...(data.clientName !== undefined && {
+        clientName: data.clientName,
+      }),
+
+      ...(data.clientPhone !== undefined && {
+        clientPhone: data.clientPhone,
+      }),
+
+      ...(data.paymentMethod !== undefined && {
+        paymentMethod: data.paymentMethod,
+      }),
+
+      ...(data.finalPrice !== undefined && {
+        finalPrice: data.finalPrice,
+      }),
+    };
+
+    if (nextStatus === BookingStatus.COMPLETED) {
+      updatePayload.paidAt = existingBooking.paidAt ?? new Date();
+
+      if (data.finalPrice === undefined || data.finalPrice === null) {
+        updatePayload.finalPrice = Number(
+          existingBooking.finalPrice ?? existingBooking.service.price ?? 0
+        );
+      }
+    }
+
+    if (nextStatus !== BookingStatus.COMPLETED) {
+      updatePayload.paidAt = null;
+    }
+
+    const updated = await this.bookingRepository.update(id, updatePayload);
 
     return this.mapToResponse(updated);
   }
 
   private mapToResponse(booking: any): BookingResponseDTO {
+    const finalPrice = booking.finalPrice ?? booking.service?.price ?? 0;
+
     return {
       id: booking.id,
       date: booking.date.toISOString(),
       endDate: booking.endDate?.toISOString(),
       status: booking.status,
+      paymentMethod: booking.paymentMethod ?? null,
+      finalPrice: booking.finalPrice ? Number(booking.finalPrice) : null,
+      paidAt: booking.paidAt?.toISOString() ?? null,
+
       service: {
         id: booking.service.id,
         name: booking.service.name,
-        price: Number(booking.service.price),
+        price: Number(finalPrice),
+        originalPrice: Number(booking.service.price),
       },
+
       barbershop: {
         id: booking.barbershop.id,
         name: booking.barbershop.name,
         imageUrl: booking.barbershop.imageUrl,
         address: booking.barbershop.address,
       },
+
       barber: {
         id: booking.barber.id,
         name: booking.barber.name,
         imageUrl: booking.barber.imageUrl,
       },
+
       user: {
         id: booking.user.id,
         name: booking.user.name,

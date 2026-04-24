@@ -79,6 +79,8 @@ function aggregateMetrics(
     userId: string | null;
     clientName: string | null;
     clientPhone: string | null;
+    finalPrice: unknown;
+
     service: {
       name: string;
       price: unknown;
@@ -105,7 +107,7 @@ function aggregateMetrics(
   );
 
   const totalRevenue = completedBookings.reduce((total, booking) => {
-    return total + Number(booking.service.price ?? 0);
+    return total + Number(booking.finalPrice ?? booking.service.price ?? 0);
   }, 0);
 
   const averageTicket =
@@ -268,6 +270,7 @@ export async function getMetrics({
     userId: true,
     clientName: true,
     clientPhone: true,
+    finalPrice: true,
     service: {
       select: {
         name: true,

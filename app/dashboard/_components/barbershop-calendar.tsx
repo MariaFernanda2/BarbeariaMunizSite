@@ -1016,6 +1016,10 @@ export default function BarbershopCalendar({
               <BookingDrawer
                 booking={selectedBooking}
                 onClose={() => setSelectedBooking(null)}
+                services={services}
+                bookings={bookings}
+                barbershopId={barbershopId}
+                currentBarberId={currentBarberId}
               />
             </div>
           </div>

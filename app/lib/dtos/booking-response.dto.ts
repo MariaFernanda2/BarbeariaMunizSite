@@ -6,11 +6,15 @@ export interface BookingResponseDTO {
 
   clientName?: string;
   clientPhone?: string;
+  paymentMethod?: "CASH" | "CARD" | null;
+  finalPrice?: number | null;
+  paidAt?: string | null;
 
   service: {
     id: string;
     name: string;
     price: number;
+    originalPrice: number;
   };
 
   barbershop: {

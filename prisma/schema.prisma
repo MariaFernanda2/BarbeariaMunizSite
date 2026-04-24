@@ -59,23 +59,32 @@ model Barber {
   reviews        BookingReview[]
   monthlyGoals   BarberMonthlyGoal[]
 }
+enum PaymentMethod {
+  CARD
+  CASH
+  PIX
+}
 
 model Booking {
-  id           String         @id @default(uuid())
-  userId       String
-  serviceId    String
-  barberId     String
-  barbershopId String
-  date         DateTime
-  endDate      DateTime
-  status       BookingStatus  @default(CONFIRMED)
-  clientName   String?
-  clientPhone  String?
-  barber       Barber         @relation(fields: [barberId], references: [id])
-  barbershop   Barbershop     @relation(fields: [barbershopId], references: [id])
-  service      Service        @relation(fields: [serviceId], references: [id])
-  user         User           @relation(fields: [userId], references: [id])
-  review       BookingReview?
+  id            String         @id @default(uuid())
+  userId        String
+  serviceId     String
+  barberId      String
+  barbershopId  String
+  date          DateTime
+  endDate       DateTime
+  status        BookingStatus  @default(CONFIRMED)
+  clientName    String?
+  clientPhone   String?
+  paymentMethod PaymentMethod?
+  finalPrice    Decimal?       @db.Decimal(10, 2)
+  paidAt        DateTime?
+
+  barber        Barber         @relation(fields: [barberId], references: [id])
+  barbershop    Barbershop     @relation(fields: [barbershopId], references: [id])
+  service       Service        @relation(fields: [serviceId], references: [id])
+  user          User           @relation(fields: [userId], references: [id])
+  review        BookingReview?
 
   @@index([barberId, date, endDate])
 }
