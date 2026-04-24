@@ -105,7 +105,7 @@ function aggregateMetrics(
   );
 
   const totalRevenue = completedBookings.reduce((total, booking) => {
-    return total + Number(booking.service.price ?? 0);
+    return total + Number(booking.finalPrice ?? booking.service.price ?? 0);
   }, 0);
 
   const averageTicket =

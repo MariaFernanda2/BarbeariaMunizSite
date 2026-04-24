@@ -96,9 +96,6 @@ export class BookingService {
           gt: bookingDate,
         },
       },
-      include: {
-        service: true,
-      },
     });
 
     if (conflictingBooking) {
@@ -143,6 +140,8 @@ export class BookingService {
       throw new AppError("Cliente inválido.", 400);
     }
 
+    const isCompleted = data.status === BookingStatus.COMPLETED;
+
     const booking = await this.bookingRepository.create({
       userId: finalUserId,
       serviceId: data.serviceId,
@@ -151,7 +150,11 @@ export class BookingService {
       date: bookingDate,
       endDate: bookingEndDate,
       clientName: data.clientName,
-      clientPhone: data.clientPhone,
+      clientPhone: data.clientPhone ?? null,
+      status: data.status ?? BookingStatus.CONFIRMED,
+      paymentMethod: data.paymentMethod ?? null,
+      finalPrice: data.finalPrice ?? Number(service.price),
+      paidAt: isCompleted ? new Date() : null,
     });
 
     return this.mapToResponse(booking);
@@ -191,153 +194,160 @@ export class BookingService {
   }
 
   async updateBooking(
-  id: string,
-  data: UpdateBookingDTO,
-  options?: UpdateBookingOptions
-) {
-  const allowPastDate = options?.allowPastDate ?? false;
+    id: string,
+    data: UpdateBookingDTO,
+    options?: UpdateBookingOptions
+  ) {
+    const allowPastDate = options?.allowPastDate ?? false;
 
-  const existingBooking = await this.bookingRepository.findById(id);
+    const existingBooking = await this.bookingRepository.findById(id);
 
-  if (!existingBooking) {
-    throw new AppError("Reserva não encontrada.", 404);
+    if (!existingBooking) {
+      throw new AppError("Reserva não encontrada.", 404);
+    }
+
+    let nextDate = existingBooking.date;
+    let nextEndDate = existingBooking.endDate;
+    const nextStatus = data.status ?? existingBooking.status;
+
+    if (data.date) {
+      const parsedDate = new Date(data.date);
+
+      if (isNaN(parsedDate.getTime())) {
+        throw new AppError("Data inválida", 400);
+      }
+
+      const service = await db.service.findUnique({
+        where: { id: existingBooking.serviceId },
+      });
+
+      if (!service) {
+        throw new AppError("Serviço não encontrado.", 404);
+      }
+
+      const recalculatedEndDate = buildBookingEndDate(
+        parsedDate,
+        service.durationInMinutes
+      );
+
+      const conflictingBooking = await db.booking.findFirst({
+        where: {
+          id: { not: id },
+          barberId: existingBooking.barberId,
+          status: {
+            in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED],
+          },
+          date: {
+            lt: recalculatedEndDate,
+          },
+          endDate: {
+            gt: parsedDate,
+          },
+        },
+      });
+
+      if (conflictingBooking) {
+        throw new AppError("Já existe outro agendamento nesse intervalo.", 409);
+      }
+
+      const conflictingBlock = await db.scheduleBlock.findFirst({
+        where: {
+          barberId: existingBooking.barberId,
+          startDate: {
+            lt: recalculatedEndDate,
+          },
+          endDate: {
+            gt: parsedDate,
+          },
+        },
+      });
+
+      if (conflictingBlock) {
+        throw new AppError("A agenda está bloqueada nesse intervalo.", 409);
+      }
+
+      nextDate = parsedDate;
+      nextEndDate = recalculatedEndDate;
+    }
+
+    const updatePayload: any = {
+      ...(data.date && {
+        date: nextDate,
+        endDate: nextEndDate,
+      }),
+
+      ...(data.status && {
+        status: nextStatus,
+      }),
+
+      ...(data.clientName !== undefined && {
+        clientName: data.clientName,
+      }),
+
+      ...(data.clientPhone !== undefined && {
+        clientPhone: data.clientPhone,
+      }),
+
+      ...(data.paymentMethod !== undefined && {
+        paymentMethod: data.paymentMethod,
+      }),
+
+      ...(data.finalPrice !== undefined && {
+        finalPrice: data.finalPrice,
+      }),
+    };
+
+    if (nextStatus === BookingStatus.COMPLETED) {
+      updatePayload.paidAt = existingBooking.paidAt ?? new Date();
+
+      if (data.finalPrice === undefined || data.finalPrice === null) {
+        updatePayload.finalPrice = Number(
+          existingBooking.finalPrice ?? existingBooking.service.price ?? 0
+        );
+      }
+    }
+
+    if (nextStatus !== BookingStatus.COMPLETED) {
+      updatePayload.paidAt = null;
+    }
+
+    const updated = await this.bookingRepository.update(id, updatePayload);
+
+    return this.mapToResponse(updated);
   }
-
-  let nextDate = existingBooking.date;
-  let nextEndDate = existingBooking.endDate;
-  let nextStatus = data.status ?? existingBooking.status;
-
-  // =========================
-  // 📅 ATUALIZA DATA
-  // =========================
-  if (data.date) {
-    const parsedDate = new Date(data.date);
-
-    if (isNaN(parsedDate.getTime())) {
-      throw new AppError("Data inválida", 400);
-    }
-
-    if (!allowPastDate && parsedDate <= new Date()) {
-      throw new AppError("A data da reserva deve ser futura.", 400);
-    }
-
-    const service = await db.service.findUnique({
-      where: { id: existingBooking.serviceId },
-    });
-
-    if (!service) {
-      throw new AppError("Serviço não encontrado.", 404);
-    }
-
-    const recalculatedEndDate = buildBookingEndDate(
-      parsedDate,
-      service.durationInMinutes
-    );
-
-    const conflictingBooking = await db.booking.findFirst({
-      where: {
-        id: { not: id },
-        barberId: existingBooking.barberId,
-        status: {
-          in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED],
-        },
-        date: {
-          lt: recalculatedEndDate,
-        },
-        endDate: {
-          gt: parsedDate,
-        },
-      },
-    });
-
-    if (conflictingBooking) {
-      throw new AppError("Já existe outro agendamento nesse intervalo.", 409);
-    }
-
-    const conflictingBlock = await db.scheduleBlock.findFirst({
-      where: {
-        barberId: existingBooking.barberId,
-        startDate: {
-          lt: recalculatedEndDate,
-        },
-        endDate: {
-          gt: parsedDate,
-        },
-      },
-    });
-
-    if (conflictingBlock) {
-      throw new AppError("A agenda está bloqueada nesse intervalo.", 409);
-    }
-
-    nextDate = parsedDate;
-    nextEndDate = recalculatedEndDate;
-  }
-
-  // =========================
-  // 💰 PREPARA DADOS
-  // =========================
-  const updatePayload: any = {
-    ...(data.date && { date: nextDate, endDate: nextEndDate }),
-    ...(data.status && { status: nextStatus }),
-
-    // NOVOS CAMPOS 👇
-    ...(data.clientName !== undefined && {
-      clientName: data.clientName,
-    }),
-
-    ...(data.clientPhone !== undefined && {
-      clientPhone: data.clientPhone,
-    }),
-
-    ...(data.paymentMethod !== undefined && {
-      paymentMethod: data.paymentMethod,
-    }),
-
-    ...(data.finalPrice !== undefined && {
-      finalPrice: data.finalPrice,
-    }),
-  };
-
-  // =========================
-  // 💸 MARCAR COMO PAGO
-  // =========================
-  if (data.status === "COMPLETED") {
-    updatePayload.paidAt = new Date();
-
-    // se não mandou preço, usa o do serviço
-    if (!data.finalPrice) {
-      updatePayload.finalPrice = Number(existingBooking.service.price);
-    }
-  }
-
-  const updated = await this.bookingRepository.update(id, updatePayload);
-
-  return this.mapToResponse(updated);
-}
 
   private mapToResponse(booking: any): BookingResponseDTO {
+    const finalPrice = booking.finalPrice ?? booking.service?.price ?? 0;
+
     return {
       id: booking.id,
       date: booking.date.toISOString(),
       endDate: booking.endDate?.toISOString(),
       status: booking.status,
+      paymentMethod: booking.paymentMethod ?? null,
+      finalPrice: booking.finalPrice ? Number(booking.finalPrice) : null,
+      paidAt: booking.paidAt?.toISOString() ?? null,
+
       service: {
         id: booking.service.id,
         name: booking.service.name,
-        price: Number(booking.service.price),
+        price: Number(finalPrice),
+        originalPrice: Number(booking.service.price),
       },
+
       barbershop: {
         id: booking.barbershop.id,
         name: booking.barbershop.name,
         imageUrl: booking.barbershop.imageUrl,
         address: booking.barbershop.address,
       },
+
       barber: {
         id: booking.barber.id,
         name: booking.barber.name,
         imageUrl: booking.barber.imageUrl,
       },
+
       user: {
         id: booking.user.id,
         name: booking.user.name,

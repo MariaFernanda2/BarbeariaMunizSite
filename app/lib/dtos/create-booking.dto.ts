@@ -8,4 +8,5 @@ export interface CreateBookingDTO {
   clientPhone?: string;
   paymentMethod?: "CARD" | "CASH" | "PIX" | null;
   finalPrice?: number | null;
+  status?: "CONFIRMED" | "COMPLETED" | "CANCELED";
 }

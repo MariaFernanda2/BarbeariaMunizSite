@@ -579,7 +579,7 @@ export default function BookingDrawer({
       clientPhone: form.clientPhone.trim() || null,
       barberName: form.barberName.trim(),
       serviceName: form.serviceName.trim(),
-      price: Number(form.price || 0),
+      finalPrice: Number(form.price || 0),
       date: new Date(form.date).toISOString(),
       status: form.status,
       paymentMethod: form.paymentMethod || null,

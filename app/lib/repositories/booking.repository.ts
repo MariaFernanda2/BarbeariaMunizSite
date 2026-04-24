@@ -1,3 +1,4 @@
+import { BookingStatus, PaymentMethod } from "@prisma/client";
 import { db } from "./prisma";
 
 export class BookingRepository {
@@ -8,8 +9,12 @@ export class BookingRepository {
     barbershopId: string;
     date: Date;
     endDate: Date;
-    clientName?: string;
-    clientPhone?: string;
+    clientName?: string | null;
+    clientPhone?: string | null;
+    status?: BookingStatus;
+    paymentMethod?: PaymentMethod | null;
+    finalPrice?: number | null;
+    paidAt?: Date | null;
   }) {
     return db.booking.create({
       data: {
@@ -21,7 +26,10 @@ export class BookingRepository {
         endDate: data.endDate,
         clientName: data.clientName,
         clientPhone: data.clientPhone,
-        status: "CONFIRMED",
+        status: data.status ?? BookingStatus.CONFIRMED,
+        paymentMethod: data.paymentMethod ?? null,
+        finalPrice: data.finalPrice ?? null,
+        paidAt: data.paidAt ?? null,
       },
       include: {
         service: true,
@@ -38,7 +46,7 @@ export class BookingRepository {
         barberId,
         date,
         status: {
-          not: "CANCELED",
+          not: BookingStatus.CANCELED,
         },
       },
       include: {
@@ -67,7 +75,7 @@ export class BookingRepository {
             }
           : {}),
         status: {
-          in: ["CONFIRMED", "COMPLETED"],
+          in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED],
         },
         date: {
           lt: params.endDate,
@@ -117,7 +125,12 @@ export class BookingRepository {
     data: {
       date?: Date;
       endDate?: Date;
-      status?: "CONFIRMED" | "COMPLETED" | "CANCELED";
+      status?: BookingStatus;
+      clientName?: string | null;
+      clientPhone?: string | null;
+      paymentMethod?: PaymentMethod | null;
+      finalPrice?: number | null;
+      paidAt?: Date | null;
     }
   ) {
     return db.booking.update({
@@ -136,7 +149,13 @@ export class BookingRepository {
     return db.booking.update({
       where: { id },
       data: {
-        status: "CANCELED",
+        status: BookingStatus.CANCELED,
+      },
+      include: {
+        service: true,
+        barbershop: true,
+        barber: true,
+        user: true,
       },
     });
   }
