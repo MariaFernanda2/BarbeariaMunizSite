@@ -37,14 +37,17 @@ type Booking = {
   user: {
     id: string;
     name: string | null;
-  };
+  } | null;
   service: {
     id: string;
     name: string;
     price: any;
+    durationInMinutes?: number | null;
   };
   clientName?: string | null;
   clientPhone?: string | null;
+  paymentMethod?: "CARD" | "CASH" | "PIX" | null;
+  finalPrice?: number | string | null;
 };
 
 type ScheduleBlock = {
@@ -57,19 +60,19 @@ type ScheduleBlock = {
 
 type CalendarEvent =
   | {
-    id: string;
-    type: "booking";
-    data: Booking;
-    start: Date;
-    end: Date;
-  }
+      id: string;
+      type: "booking";
+      data: Booking;
+      start: Date;
+      end: Date;
+    }
   | {
-    id: string;
-    type: "block";
-    data: ScheduleBlock;
-    start: Date;
-    end: Date;
-  };
+      id: string;
+      type: "block";
+      data: ScheduleBlock;
+      start: Date;
+      end: Date;
+    };
 
 type EventWithLayout = CalendarEvent & {
   lane: number;
@@ -85,7 +88,7 @@ interface Props {
     price: any;
     description?: string;
     imageUrl?: string;
-    durationInMinutes?: number;
+    durationInMinutes?: number | null;
   }[];
   scheduleBlocks: ScheduleBlock[];
   barbershopId: string;
@@ -94,7 +97,11 @@ interface Props {
 }
 
 const START_HOUR = 8;
-const END_HOUR = 22;
+const WEEKDAY_LAST_START_HOUR = 20;
+const WEEKDAY_CLOSE_HOUR = 21;
+const SATURDAY_LAST_START_HOUR = 21;
+const SATURDAY_CLOSE_HOUR = 22;
+const CALENDAR_END_HOUR = 22;
 const HOUR_HEIGHT = 88;
 const MIN_EVENT_HEIGHT = 44;
 const DESKTOP_COLUMN_MIN_WIDTH = 300;
@@ -125,11 +132,11 @@ function parseDatetimeLocalToUtc(value: string) {
   const [year, month, day] = datePart.split("-").map(Number);
   const selectedDate = new Date(year, month - 1, day);
 
-  return buildUtcDateFromLocalSelection(
-    selectedDate,
-    timePart,
-    APP_TIME_ZONE
-  );
+  return buildUtcDateFromLocalSelection(selectedDate, timePart, APP_TIME_ZONE);
+}
+
+function addMinutes(date: Date, minutes: number) {
+  return new Date(date.getTime() + minutes * 60 * 1000);
 }
 
 function formatPhone(value: string) {
@@ -199,25 +206,85 @@ function getHeightFromRange(start: Date, end: Date) {
   return Math.max(height, MIN_EVENT_HEIGHT);
 }
 
-function isSameAppDay(date: Date, target: Date) {
-  const a = formatBookingInAppTimeZone(date, "yyyy-MM-dd", APP_TIME_ZONE);
-  const b = formatBookingInAppTimeZone(target, "yyyy-MM-dd", APP_TIME_ZONE);
-  return a === b;
-}
-
 function intersectsDay(start: Date, end: Date, day: Date) {
   const dayStart = startOfDay(day);
   const dayEnd = endOfDay(day);
   return start <= dayEnd && end >= dayStart;
 }
 
+function getScheduleLimits(date: Date) {
+  const weekday = Number(formatBookingInAppTimeZone(date, "i", APP_TIME_ZONE));
+  const isSaturday = weekday === 6;
+  const isSunday = weekday === 7;
+
+  return {
+    isSaturday,
+    isSunday,
+    startHour: START_HOUR,
+    lastStartHour: isSaturday ? SATURDAY_LAST_START_HOUR : WEEKDAY_LAST_START_HOUR,
+    closeHour: isSaturday ? SATURDAY_CLOSE_HOUR : WEEKDAY_CLOSE_HOUR,
+    label: isSaturday ? "08:00 às 22:00" : "08:00 às 21:00",
+    lastStartLabel: isSaturday ? "21:00" : "20:00",
+  };
+}
+
+function validateBookingSchedule(date: Date, durationInMinutes: number) {
+  const limits = getScheduleLimits(date);
+
+  if (limits.isSunday) {
+    throw new Error("A barbearia não recebe agendamentos aos domingos.");
+  }
+
+  const hour = Number(formatBookingInAppTimeZone(date, "H", APP_TIME_ZONE));
+  const minute = Number(formatBookingInAppTimeZone(date, "m", APP_TIME_ZONE));
+  const startMinutes = hour * 60 + minute;
+  const minStartMinutes = limits.startHour * 60;
+  const maxStartMinutes = limits.lastStartHour * 60;
+  const closeMinutes = limits.closeHour * 60;
+  const endMinutes = startMinutes + durationInMinutes;
+
+  if (startMinutes < minStartMinutes) {
+    throw new Error("O agendamento só pode iniciar a partir das 08:00.");
+  }
+
+  if (startMinutes > maxStartMinutes) {
+    throw new Error(
+      limits.isSaturday
+        ? "Aos sábados, o último horário de início é 21:00."
+        : "De segunda a sexta, o último horário de início é 20:00."
+    );
+  }
+
+  if (endMinutes > closeMinutes) {
+    throw new Error(
+      limits.isSaturday
+        ? "Aos sábados, o atendimento precisa terminar até 22:00."
+        : "De segunda a sexta, o atendimento precisa terminar até 21:00."
+    );
+  }
+}
+
 function clampEventToVisibleHours(start: Date, end: Date, visibleDate: Date) {
-  const day = formatBookingInAppTimeZone(visibleDate, "yyyy-MM-dd", APP_TIME_ZONE);
+  const day = formatBookingInAppTimeZone(
+    visibleDate,
+    "yyyy-MM-dd",
+    APP_TIME_ZONE
+  );
 
-  const visibleStart = new Date(`${day}T${String(START_HOUR).padStart(2, "0")}:00:00`);
-  const visibleEnd = new Date(`${day}T${String(END_HOUR).padStart(2, "0")}:00:00`);
+  const visibleStart = buildUtcDateFromLocalSelection(
+    new Date(`${day}T00:00:00`),
+    `${String(START_HOUR).padStart(2, "0")}:00`,
+    APP_TIME_ZONE
+  );
+  const visibleEnd = buildUtcDateFromLocalSelection(
+    new Date(`${day}T00:00:00`),
+    `${String(CALENDAR_END_HOUR).padStart(2, "0")}:00`,
+    APP_TIME_ZONE
+  );
 
-  const clampedStart = new Date(Math.max(start.getTime(), visibleStart.getTime()));
+  const clampedStart = new Date(
+    Math.max(start.getTime(), visibleStart.getTime())
+  );
   const clampedEnd = new Date(Math.min(end.getTime(), visibleEnd.getTime()));
 
   return {
@@ -266,15 +333,22 @@ function getBookingStatusLabel(status: Booking["status"]) {
   }
 }
 
-function buildTimeSlots() {
+function buildTimeSlots(currentDate: Date) {
   const slots: Date[] = [];
-  const base = new Date();
+
+  const dateKey = formatBookingInAppTimeZone(
+    currentDate,
+    "yyyy-MM-dd",
+    APP_TIME_ZONE
+  );
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const base = new Date(year, month - 1, day);
   base.setHours(START_HOUR, 0, 0, 0);
 
-  const end = new Date();
-  end.setHours(END_HOUR, 0, 0, 0);
+  const end = new Date(year, month - 1, day);
+  end.setHours(CALENDAR_END_HOUR, 0, 0, 0);
 
-  while (base <= end) {
+  while (base < end) {
     slots.push(new Date(base));
     base.setMinutes(base.getMinutes() + 30);
   }
@@ -403,13 +477,13 @@ export default function BarbershopCalendar({
   const hours = useMemo(
     () =>
       Array.from(
-        { length: END_HOUR - START_HOUR + 1 },
+        { length: CALENDAR_END_HOUR - START_HOUR },
         (_, index) => START_HOUR + index
       ),
     []
   );
 
-  const halfHourSlots = useMemo(() => buildTimeSlots(), []);
+  const halfHourSlots = useMemo(() => buildTimeSlots(currentDate), [currentDate]);
 
   const visibleRange = useMemo(
     () => ({
@@ -418,6 +492,8 @@ export default function BarbershopCalendar({
     }),
     [currentDate]
   );
+
+  const daySchedule = useMemo(() => getScheduleLimits(currentDate), [currentDate]);
 
   const groupedEvents = useMemo(() => {
     return (barbers ?? []).map((barber) => {
@@ -476,6 +552,7 @@ export default function BarbershopCalendar({
     setClientName("");
     setClientPhone("");
     setServiceId("");
+    setIsQuickClient(false);
     setOpenActionMenuBarberId(null);
     setIsCreateModalOpen(true);
   }
@@ -487,6 +564,7 @@ export default function BarbershopCalendar({
     setClientName("");
     setClientPhone("");
     setServiceId("");
+    setIsQuickClient(false);
   }
 
   function openBlockModal(barberId: string, date?: Date) {
@@ -494,8 +572,7 @@ export default function BarbershopCalendar({
 
     if (date) {
       const start = toDatetimeLocal(date);
-      const endDate = new Date(date);
-      endDate.setHours(endDate.getHours() + 1);
+      const endDate = addMinutes(date, 60);
 
       setBlockStartDateTime(start);
       setBlockEndDateTime(toDatetimeLocal(endDate));
@@ -533,7 +610,12 @@ export default function BarbershopCalendar({
     try {
       setIsSavingCreate(true);
 
+      const selectedService = services.find((service) => service.id === serviceId);
+      const durationInMinutes = Number(selectedService?.durationInMinutes ?? 60);
       const utcDate = parseDatetimeLocalToUtc(selectedDateTime);
+      const endDate = addMinutes(utcDate, durationInMinutes);
+
+      validateBookingSchedule(utcDate, durationInMinutes);
 
       const response = await fetch("/api/v1/bookings", {
         method: "POST",
@@ -544,9 +626,10 @@ export default function BarbershopCalendar({
           barberId: selectedBarberId,
           barbershopId,
           clientName: clientName.trim(),
-          clientPhone: clientPhone.trim(),
+          clientPhone: clientPhone.trim() || null,
           serviceId,
           date: utcDate.toISOString(),
+          endDate: endDate.toISOString(),
         }),
       });
 
@@ -574,6 +657,10 @@ export default function BarbershopCalendar({
       const utcStartDate = parseDatetimeLocalToUtc(blockStartDateTime);
       const utcEndDate = parseDatetimeLocalToUtc(blockEndDateTime);
 
+      if (utcEndDate <= utcStartDate) {
+        throw new Error("O fim do bloqueio precisa ser maior que o início.");
+      }
+
       const response = await fetch("/api/v1/schedule-blocks", {
         method: "POST",
         headers: {
@@ -584,7 +671,7 @@ export default function BarbershopCalendar({
           barbershopId,
           startDate: utcStartDate.toISOString(),
           endDate: utcEndDate.toISOString(),
-          reason: blockReason,
+          reason: blockReason.trim() || null,
         }),
       });
 
@@ -618,7 +705,7 @@ export default function BarbershopCalendar({
               </h2>
 
               <p className="mt-1 text-sm text-zinc-400">
-                Visualização por barbeiro com agendamentos e bloqueios reais por duração.
+                Segunda a sexta: início até 20:00. Sábado: início até 21:00 e término até 22:00.
               </p>
             </div>
 
@@ -636,7 +723,7 @@ export default function BarbershopCalendar({
                   {formatVisibleDate(currentDate)}
                 </p>
                 <p className="text-sm capitalize text-zinc-400">
-                  {getViewSubtitle(currentDate)}
+                  {getViewSubtitle(currentDate)} • {daySchedule.label}
                 </p>
               </div>
 
@@ -667,7 +754,7 @@ export default function BarbershopCalendar({
                         {barber.name}
                       </p>
                       <p className="text-xs text-zinc-400">
-                        Agenda do dia • 08:00 às 20:00
+                        Agenda do dia • {daySchedule.label}
                       </p>
                     </div>
                   </div>
@@ -685,7 +772,7 @@ export default function BarbershopCalendar({
                       <div className="absolute right-0 top-12 z-30 w-56 overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 shadow-2xl">
                         <button
                           type="button"
-                          onClick={() => openCreateModal(barber.id)}
+                          onClick={() => openCreateModal(barber.id, currentDate)}
                           className="flex w-full items-center px-4 py-3 text-left text-sm text-white transition hover:bg-white/5"
                         >
                           Novo agendamento
@@ -726,7 +813,7 @@ export default function BarbershopCalendar({
                                   {formatTime(event.start)} - {formatTime(event.end)}
                                 </p>
                                 <p className="mt-1 truncate text-sm font-bold">
-                                  {booking.clientName || booking.user.name || "Cliente"}
+                                  {booking.clientName || booking.user?.name || "Cliente"}
                                 </p>
                                 <p className="truncate text-xs opacity-90">
                                   {booking.service.name}
@@ -807,7 +894,7 @@ export default function BarbershopCalendar({
                                 {barber.name}
                               </p>
                               <p className="text-xs text-zinc-400">
-                                Agenda do dia • 08:00 às 20:00
+                                Agenda do dia • {daySchedule.label}
                               </p>
                             </div>
                           </div>
@@ -825,7 +912,7 @@ export default function BarbershopCalendar({
                               <div className="absolute right-0 top-12 z-30 w-56 overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 shadow-2xl">
                                 <button
                                   type="button"
-                                  onClick={() => openCreateModal(barber.id)}
+                                  onClick={() => openCreateModal(barber.id, currentDate)}
                                   className="flex w-full items-center px-4 py-3 text-left text-sm text-white transition hover:bg-white/5"
                                 >
                                   Novo agendamento
@@ -882,12 +969,22 @@ export default function BarbershopCalendar({
                           const slotDate = new Date(currentDate);
                           slotDate.setHours(slot.getHours(), slot.getMinutes(), 0, 0);
 
+                          const limits = getScheduleLimits(slotDate);
+                          const slotStartMinutes =
+                            Number(formatBookingInAppTimeZone(slotDate, "H", APP_TIME_ZONE)) * 60 +
+                            Number(formatBookingInAppTimeZone(slotDate, "m", APP_TIME_ZONE));
+                          const isSlotAvailable =
+                            !limits.isSunday &&
+                            slotStartMinutes >= limits.startHour * 60 &&
+                            slotStartMinutes <= limits.lastStartHour * 60;
+
                           return (
                             <button
                               key={`${barber.id}-slot-${index}`}
                               type="button"
+                              disabled={!isSlotAvailable}
                               onClick={() => openCreateModal(barber.id, slotDate)}
-                              className="absolute left-0 right-0 z-0 block border-transparent text-left transition hover:bg-white/[0.03]"
+                              className="absolute left-0 right-0 z-0 block border-transparent text-left transition hover:bg-white/[0.03] disabled:pointer-events-none disabled:bg-black/20 disabled:opacity-40"
                               style={{
                                 top: getTopFromDate(slotDate),
                                 height: HOUR_HEIGHT / 2,
@@ -941,7 +1038,7 @@ export default function BarbershopCalendar({
                                           {formatTime(event.start)} - {formatTime(event.end)}
                                         </p>
                                         <p className="truncate text-sm font-bold">
-                                          {booking.clientName || booking.user.name || "Cliente"}
+                                          {booking.clientName || booking.user?.name || "Cliente"}
                                         </p>
                                       </div>
 
@@ -1033,7 +1130,7 @@ export default function BarbershopCalendar({
               <div>
                 <h2 className="text-xl font-bold text-white">Novo agendamento</h2>
                 <p className="mt-1 text-sm text-zinc-400">
-                  Crie um horário e deixe a agenda organizada.
+                  Segunda a sexta até 20:00. Sábado até 21:00, com término máximo às 22:00.
                 </p>
               </div>
 
@@ -1079,6 +1176,7 @@ export default function BarbershopCalendar({
 
               <div className="mt-2 flex items-center gap-2">
                 <input
+                  id="clienteRapido"
                   type="checkbox"
                   checked={isQuickClient}
                   onChange={(e) => {
@@ -1096,7 +1194,7 @@ export default function BarbershopCalendar({
 
                 <label
                   htmlFor="clienteRapido"
-                  className="text-sm text-zinc-400 cursor-pointer"
+                  className="cursor-pointer text-sm text-zinc-400"
                 >
                   Cliente rápido (balcão)
                 </label>

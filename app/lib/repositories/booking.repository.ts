@@ -1,6 +1,13 @@
 import { BookingStatus, PaymentMethod } from "@prisma/client";
 import { db } from "./prisma";
 
+const bookingInclude = {
+  service: true,
+  barbershop: true,
+  barber: true,
+  user: true,
+};
+
 export class BookingRepository {
   async create(data: {
     userId: string;
@@ -24,18 +31,30 @@ export class BookingRepository {
         barbershopId: data.barbershopId,
         date: data.date,
         endDate: data.endDate,
-        clientName: data.clientName,
-        clientPhone: data.clientPhone,
+        clientName: data.clientName ?? null,
+        clientPhone: data.clientPhone ?? null,
         status: data.status ?? BookingStatus.CONFIRMED,
         paymentMethod: data.paymentMethod ?? null,
         finalPrice: data.finalPrice ?? null,
         paidAt: data.paidAt ?? null,
       },
-      include: {
-        service: true,
-        barbershop: true,
-        barber: true,
-        user: true,
+      include: bookingInclude,
+    });
+  }
+
+  async findById(id: string) {
+    return db.booking.findUnique({
+      where: { id },
+      include: bookingInclude,
+    });
+  }
+
+  async findByUser(userId: string) {
+    return db.booking.findMany({
+      where: { userId },
+      include: bookingInclude,
+      orderBy: {
+        date: "desc",
       },
     });
   }
@@ -49,11 +68,14 @@ export class BookingRepository {
           not: BookingStatus.CANCELED,
         },
       },
-      include: {
-        service: true,
-        barbershop: true,
-        barber: true,
-        user: true,
+      include: bookingInclude,
+    });
+  }
+
+  async findServiceById(serviceId: string) {
+    return db.service.findUnique({
+      where: {
+        id: serviceId,
       },
     });
   }
@@ -84,40 +106,47 @@ export class BookingRepository {
           gt: params.startDate,
         },
       },
-      include: {
-        service: true,
-        barbershop: true,
-        barber: true,
-        user: true,
+      include: bookingInclude,
+    });
+  }
+
+  async findConflictingBlock(params: {
+    barberId: string;
+    startDate: Date;
+    endDate: Date;
+  }) {
+    return db.scheduleBlock.findFirst({
+      where: {
+        barberId: params.barberId,
+        startDate: {
+          lt: params.endDate,
+        },
+        endDate: {
+          gt: params.startDate,
+        },
       },
     });
   }
 
-  async findById(id: string) {
-    return db.booking.findUnique({
-      where: { id },
-      include: {
-        service: true,
-        barbershop: true,
-        barber: true,
-        user: true,
-      },
-    });
-  }
+  async hasConflict(params: {
+    barberId: string;
+    startDate: Date;
+    endDate: Date;
+    excludeBookingId?: string;
+  }) {
+    const conflictingBooking = await this.findConflictingBooking(params);
 
-  async findByUser(userId: string) {
-    return db.booking.findMany({
-      where: { userId },
-      include: {
-        service: true,
-        barbershop: true,
-        barber: true,
-        user: true,
-      },
-      orderBy: {
-        date: "desc",
-      },
+    if (conflictingBooking) {
+      return true;
+    }
+
+    const conflictingBlock = await this.findConflictingBlock({
+      barberId: params.barberId,
+      startDate: params.startDate,
+      endDate: params.endDate,
     });
+
+    return !!conflictingBlock;
   }
 
   async update(
@@ -131,17 +160,13 @@ export class BookingRepository {
       paymentMethod?: PaymentMethod | null;
       finalPrice?: number | null;
       paidAt?: Date | null;
+      serviceId?: string;
     }
   ) {
     return db.booking.update({
       where: { id },
       data,
-      include: {
-        service: true,
-        barbershop: true,
-        barber: true,
-        user: true,
-      },
+      include: bookingInclude,
     });
   }
 
@@ -150,13 +175,9 @@ export class BookingRepository {
       where: { id },
       data: {
         status: BookingStatus.CANCELED,
+        paidAt: null,
       },
-      include: {
-        service: true,
-        barbershop: true,
-        barber: true,
-        user: true,
-      },
+      include: bookingInclude,
     });
   }
 }
