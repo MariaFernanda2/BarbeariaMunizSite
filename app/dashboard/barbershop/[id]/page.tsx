@@ -102,8 +102,21 @@ export default async function DashboardBarbershopPage({
       <div className="mx-auto max-w-[1600px] px-6 py-6">
         <BarbershopCalendar
           barbers={barbershop.barbers}
-          bookings={bookings}
-          services={barbershop.services}
+          bookings={bookings.map((booking) => ({
+            ...booking,
+            finalPrice:
+              booking.finalPrice !== null && booking.finalPrice !== undefined
+                ? Number(booking.finalPrice)
+                : null,
+            service: {
+              ...booking.service,
+              price: Number(booking.service.price),
+            },
+          }))}
+          services={barbershop.services.map((service) => ({
+            ...service,
+            price: Number(service.price),
+          }))}
           scheduleBlocks={scheduleBlocks}
           barbershopId={barbershop.id}
           currentBarberId={currentBarberId}

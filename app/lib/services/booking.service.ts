@@ -25,7 +25,7 @@ export class BookingService {
 
   async create(
     data: CreateBookingDTO,
-    options?: CreateBookingOptions
+    options?: CreateBookingOptions,
   ): Promise<BookingResponseDTO> {
     const bookingDate = new Date(data.date);
     const allowPastDate = options?.allowPastDate ?? false;
@@ -80,7 +80,7 @@ export class BookingService {
 
     const bookingEndDate = buildBookingEndDate(
       bookingDate,
-      service.durationInMinutes
+      service.durationInMinutes,
     );
 
     const conflictingBooking = await db.booking.findFirst({
@@ -101,7 +101,7 @@ export class BookingService {
     if (conflictingBooking) {
       throw new AppError(
         "Já existe um agendamento em andamento nesse intervalo.",
-        409
+        409,
       );
     }
 
@@ -170,7 +170,7 @@ export class BookingService {
     if (new Date(booking.date) <= new Date()) {
       throw new AppError(
         "Não é possível cancelar reserva finalizada ou em andamento.",
-        400
+        400,
       );
     }
 
@@ -196,10 +196,8 @@ export class BookingService {
   async updateBooking(
     id: string,
     data: UpdateBookingDTO,
-    options?: UpdateBookingOptions
+    options?: UpdateBookingOptions,
   ) {
-    const allowPastDate = options?.allowPastDate ?? false;
-
     const existingBooking = await this.bookingRepository.findById(id);
 
     if (!existingBooking) {
@@ -207,74 +205,80 @@ export class BookingService {
     }
 
     let nextDate = existingBooking.date;
-    let nextEndDate = existingBooking.endDate;
+    let nextServiceId = existingBooking.serviceId;
     const nextStatus = data.status ?? existingBooking.status;
 
     if (data.date) {
       const parsedDate = new Date(data.date);
 
       if (isNaN(parsedDate.getTime())) {
-        throw new AppError("Data inválida", 400);
-      }
-
-      const service = await db.service.findUnique({
-        where: { id: existingBooking.serviceId },
-      });
-
-      if (!service) {
-        throw new AppError("Serviço não encontrado.", 404);
-      }
-
-      const recalculatedEndDate = buildBookingEndDate(
-        parsedDate,
-        service.durationInMinutes
-      );
-
-      const conflictingBooking = await db.booking.findFirst({
-        where: {
-          id: { not: id },
-          barberId: existingBooking.barberId,
-          status: {
-            in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED],
-          },
-          date: {
-            lt: recalculatedEndDate,
-          },
-          endDate: {
-            gt: parsedDate,
-          },
-        },
-      });
-
-      if (conflictingBooking) {
-        throw new AppError("Já existe outro agendamento nesse intervalo.", 409);
-      }
-
-      const conflictingBlock = await db.scheduleBlock.findFirst({
-        where: {
-          barberId: existingBooking.barberId,
-          startDate: {
-            lt: recalculatedEndDate,
-          },
-          endDate: {
-            gt: parsedDate,
-          },
-        },
-      });
-
-      if (conflictingBlock) {
-        throw new AppError("A agenda está bloqueada nesse intervalo.", 409);
+        throw new AppError("Data inválida.", 400);
       }
 
       nextDate = parsedDate;
-      nextEndDate = recalculatedEndDate;
+    }
+
+    if (data.serviceId) {
+      nextServiceId = data.serviceId;
+    }
+
+    const service = await db.service.findUnique({
+      where: { id: nextServiceId },
+    });
+
+    if (!service) {
+      throw new AppError("Serviço não encontrado.", 404);
+    }
+
+    if (String(service.barbershopId) !== String(existingBooking.barbershopId)) {
+      throw new AppError("O serviço não pertence a essa unidade.", 400);
+    }
+
+    const nextEndDate = buildBookingEndDate(
+      nextDate,
+      service.durationInMinutes,
+    );
+
+    const conflictingBooking = await db.booking.findFirst({
+      where: {
+        id: { not: id },
+        barberId: existingBooking.barberId,
+        status: {
+          in: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED],
+        },
+        date: {
+          lt: nextEndDate,
+        },
+        endDate: {
+          gt: nextDate,
+        },
+      },
+    });
+
+    if (conflictingBooking) {
+      throw new AppError("Já existe outro agendamento nesse intervalo.", 409);
+    }
+
+    const conflictingBlock = await db.scheduleBlock.findFirst({
+      where: {
+        barberId: existingBooking.barberId,
+        startDate: {
+          lt: nextEndDate,
+        },
+        endDate: {
+          gt: nextDate,
+        },
+      },
+    });
+
+    if (conflictingBlock) {
+      throw new AppError("A agenda está bloqueada nesse intervalo.", 409);
     }
 
     const updatePayload: any = {
-      ...(data.date && {
-        date: nextDate,
-        endDate: nextEndDate,
-      }),
+      date: nextDate,
+      endDate: nextEndDate,
+      serviceId: nextServiceId,
 
       ...(data.status && {
         status: nextStatus,
@@ -301,9 +305,7 @@ export class BookingService {
       updatePayload.paidAt = existingBooking.paidAt ?? new Date();
 
       if (data.finalPrice === undefined || data.finalPrice === null) {
-        updatePayload.finalPrice = Number(
-          existingBooking.finalPrice ?? existingBooking.service.price ?? 0
-        );
+        updatePayload.finalPrice = Number(service.price ?? 0);
       }
     }
 

@@ -34,30 +34,37 @@ import {
   SheetTitle,
 } from "@/app/_components/ui/sheet";
 
+import {
+  APP_TIME_ZONE,
+  buildUtcDateFromLocalSelection,
+  formatBookingInAppTimeZone,
+} from "@/app/lib/utils/timezone";
+
 type PaymentMethod = "CARD" | "CASH" | "PIX" | "";
 
 type Service = {
   id: string;
   name: string;
   price: any;
-  durationInMinutes?: number;
+  durationInMinutes?: number | null;
 };
 
 type Booking = {
   id: string;
   date: string | Date;
-  endDate?: string | Date;
+  endDate?: string | Date | null;
   status: "CONFIRMED" | "COMPLETED" | "CANCELED";
   barber: {
     name: string;
   };
   user: {
     name: string | null;
-  };
+  } | null;
   service: {
     id: string;
     name: string;
     price: any;
+    durationInMinutes?: number | null;
   };
   clientName?: string | null;
   clientPhone?: string | null;
@@ -76,7 +83,7 @@ interface Props {
 }
 
 type BookingForm = {
-  serviceId?: string;
+  serviceId: string;
   clientName: string;
   clientPhone: string;
   barberName: string;
@@ -87,14 +94,84 @@ type BookingForm = {
   paymentMethod: PaymentMethod;
 };
 
+const START_HOUR = 8;
+const WEEKDAY_LAST_START_HOUR = 20;
+const WEEKDAY_CLOSE_HOUR = 21;
+const SATURDAY_LAST_START_HOUR = 21;
+const SATURDAY_CLOSE_HOUR = 22;
+
 const inputClass =
   "w-full rounded-xl border border-white/10 bg-zinc-900 px-3 py-2.5 text-sm font-semibold text-white outline-none transition placeholder:text-zinc-600 focus:border-[hsl(43_96%_56%_/_0.55)] focus:ring-2 focus:ring-[hsl(43_96%_56%_/_0.10)] disabled:cursor-not-allowed disabled:opacity-50";
 
 function toLocalInputValue(date: string | Date) {
-  const d = new Date(date);
-  const offset = d.getTimezoneOffset();
-  const local = new Date(d.getTime() - offset * 60 * 1000);
-  return local.toISOString().slice(0, 16);
+  return formatBookingInAppTimeZone(date, "yyyy-MM-dd'T'HH:mm", APP_TIME_ZONE);
+}
+
+function parseDatetimeLocalToUtc(value: string) {
+  const [datePart, timePart] = value.split("T");
+
+  if (!datePart || !timePart) {
+    throw new Error("Data/hora inválida.");
+  }
+
+  const [year, month, day] = datePart.split("-").map(Number);
+  const selectedDate = new Date(year, month - 1, day);
+
+  return buildUtcDateFromLocalSelection(selectedDate, timePart, APP_TIME_ZONE);
+}
+
+function addMinutes(date: Date, minutes: number) {
+  return new Date(date.getTime() + minutes * 60 * 1000);
+}
+
+function getBookingScheduleLimits(date: Date) {
+  const weekday = Number(formatBookingInAppTimeZone(date, "i", APP_TIME_ZONE));
+  const isSaturday = weekday === 6;
+  const isSunday = weekday === 7;
+
+  return {
+    isSaturday,
+    isSunday,
+    startHour: START_HOUR,
+    lastStartHour: isSaturday ? SATURDAY_LAST_START_HOUR : WEEKDAY_LAST_START_HOUR,
+    closeHour: isSaturday ? SATURDAY_CLOSE_HOUR : WEEKDAY_CLOSE_HOUR,
+  };
+}
+
+function validateBookingSchedule(date: Date, durationInMinutes: number) {
+  const limits = getBookingScheduleLimits(date);
+
+  if (limits.isSunday) {
+    throw new Error("A barbearia não recebe agendamentos aos domingos.");
+  }
+
+  const hour = Number(formatBookingInAppTimeZone(date, "H", APP_TIME_ZONE));
+  const minute = Number(formatBookingInAppTimeZone(date, "m", APP_TIME_ZONE));
+  const startMinutes = hour * 60 + minute;
+  const minStartMinutes = limits.startHour * 60;
+  const maxStartMinutes = limits.lastStartHour * 60;
+  const closeMinutes = limits.closeHour * 60;
+  const endMinutes = startMinutes + durationInMinutes;
+
+  if (startMinutes < minStartMinutes) {
+    throw new Error("O agendamento só pode iniciar a partir das 08:00.");
+  }
+
+  if (startMinutes > maxStartMinutes) {
+    throw new Error(
+      limits.isSaturday
+        ? "Aos sábados, o último horário de início é 21:00."
+        : "De segunda a sexta, o último horário de início é 20:00."
+    );
+  }
+
+  if (endMinutes > closeMinutes) {
+    throw new Error(
+      limits.isSaturday
+        ? "Aos sábados, o atendimento precisa terminar até 22:00."
+        : "De segunda a sexta, o atendimento precisa terminar até 21:00."
+    );
+  }
 }
 
 function formatCurrency(value: any) {
@@ -177,9 +254,7 @@ function Field({
   return (
     <div className="space-y-1.5">
       <label className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-500">
-        {icon ? (
-          <span className="text-[hsl(43_96%_56%)]">{icon}</span>
-        ) : null}
+        {icon ? <span className="text-[hsl(43_96%_56%)]">{icon}</span> : null}
         {label}
       </label>
 
@@ -211,7 +286,7 @@ function BookingDetailsContent({
   onSave: () => void;
   onCheckout: () => void;
 }) {
-  const clientDisplayName = form.clientName || booking.user.name || "Cliente";
+  const clientDisplayName = form.clientName || booking.user?.name || "Cliente";
   const canCheckout = form.status !== "CANCELED" && !!form.paymentMethod;
 
   function updateField<K extends keyof BookingForm>(
@@ -226,14 +301,7 @@ function BookingDetailsContent({
 
     if (!phone) return;
 
-    const message = `Olá ${clientDisplayName}! 👋
-
-Seu atendimento na Barbearia Muniz está confirmado ✂️
-
-💈 ${form.serviceName}
-💰 ${formatCurrency(form.price)}
-
-Obrigado pela preferência!`;
+    const message = `Olá ${clientDisplayName}! 👋\n\nSeu atendimento na Barbearia Muniz está confirmado ✂️\n\n💈 ${form.serviceName}\n💰 ${formatCurrency(form.price)}\n\nObrigado pela preferência!`;
 
     window.open(
       `https://wa.me/55${phone}?text=${encodeURIComponent(message)}`,
@@ -362,13 +430,14 @@ Obrigado pela preferência!`;
               disabled={loading}
               onValueChange={(value) => {
                 const selected = services.find((s) => s.id === value);
+
                 if (!selected) return;
 
                 setForm((prev) => ({
                   ...prev,
                   serviceId: selected.id,
                   serviceName: selected.name,
-                  price: String(Number(selected.price)),
+                  price: String(Number(selected.price ?? 0)),
                 }));
               }}
             >
@@ -431,21 +500,9 @@ Obrigado pela preferência!`;
           <Field label="Pagamento" icon={<CreditCard size={14} />}>
             <div className="grid grid-cols-3 gap-2">
               {[
-                {
-                  value: "CARD",
-                  label: "Cartão",
-                  icon: <CreditCard size={14} />,
-                },
-                {
-                  value: "CASH",
-                  label: "Dinheiro",
-                  icon: <Banknote size={14} />,
-                },
-                {
-                  value: "PIX",
-                  label: "Pix",
-                  icon: <Wallet size={14} />,
-                },
+                { value: "CARD", label: "Cartão", icon: <CreditCard size={14} /> },
+                { value: "CASH", label: "Dinheiro", icon: <Banknote size={14} /> },
+                { value: "PIX", label: "Pix", icon: <Wallet size={14} /> },
               ].map((item) => (
                 <button
                   key={item.value}
@@ -454,11 +511,10 @@ Obrigado pela preferência!`;
                   onClick={() =>
                     updateField("paymentMethod", item.value as PaymentMethod)
                   }
-                  className={`flex items-center justify-center gap-1.5 rounded-xl border px-2 py-2.5 text-[11px] font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                    form.paymentMethod === item.value
+                  className={`flex items-center justify-center gap-1.5 rounded-xl border px-2 py-2.5 text-[11px] font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${form.paymentMethod === item.value
                       ? "border-[hsl(43_96%_56%_/_0.55)] bg-[hsl(43_96%_56%_/_0.16)] text-[hsl(43_96%_56%)]"
                       : "border-white/10 bg-zinc-900 text-zinc-300 hover:bg-white/5"
-                  }`}
+                    }`}
                 >
                   {item.icon}
                   {item.label}
@@ -476,9 +532,9 @@ Obrigado pela preferência!`;
           <Field label="Barbeiro" icon={<UserRound size={14} />}>
             <input
               value={form.barberName}
-              onChange={(e) => updateField("barberName", e.target.value)}
+              readOnly
+              disabled
               placeholder="Nome do barbeiro"
-              disabled={loading}
               className={inputClass}
             />
           </Field>
@@ -622,7 +678,7 @@ export default function BookingDrawer({
 
     setForm({
       serviceId: booking.service.id,
-      clientName: booking.clientName || booking.user.name || "",
+      clientName: booking.clientName || booking.user?.name || "",
       clientPhone: booking.clientPhone || "",
       barberName: booking.barber.name || "",
       serviceName: booking.service.name || "",
@@ -664,14 +720,38 @@ export default function BookingDrawer({
   async function updateBooking(extraPayload?: Record<string, any>) {
     if (!booking) return;
 
+    if (!form.serviceId) {
+      throw new Error("Selecione um serviço.");
+    }
+
+    if (!form.clientName.trim()) {
+      throw new Error("Informe o nome do cliente.");
+    }
+
+    if (!form.date) {
+      throw new Error("Informe a data e horário.");
+    }
+
+    if (Number(form.price) < 0) {
+      throw new Error("O valor não pode ser negativo.");
+    }
+
+    const selectedService = sortedServices.find(
+      (service) => service.id === form.serviceId
+    );
+    const durationInMinutes = Number(selectedService?.durationInMinutes ?? 60);
+    const startDate = parseDatetimeLocalToUtc(form.date);
+    const endDate = addMinutes(startDate, durationInMinutes);
+
+    validateBookingSchedule(startDate, durationInMinutes);
+
     const payload = {
       serviceId: form.serviceId,
       clientName: form.clientName.trim(),
       clientPhone: form.clientPhone.trim() || null,
-      barberName: form.barberName.trim(),
-      serviceName: form.serviceName.trim(),
       finalPrice: Number(form.price || 0),
-      date: new Date(form.date).toISOString(),
+      date: startDate.toISOString(),
+      endDate: endDate.toISOString(),
       status: form.status,
       paymentMethod: form.paymentMethod || null,
       ...extraPayload,
@@ -722,6 +802,7 @@ export default function BookingDrawer({
 
       await updateBooking({
         status: "COMPLETED",
+        paidAt: new Date().toISOString(),
       });
     } catch (error) {
       setErrorMessage(
@@ -753,6 +834,11 @@ export default function BookingDrawer({
 
       setQuickLoading(true);
 
+      const service = sortedServices.find((item) => item.id === quickServiceId);
+      const durationInMinutes = Number(service?.durationInMinutes ?? 60);
+      const startDate = new Date();
+      const endDate = addMinutes(startDate, durationInMinutes);
+
       const response = await fetch("/api/v1/bookings", {
         method: "POST",
         headers: {
@@ -764,9 +850,12 @@ export default function BookingDrawer({
           serviceId: quickServiceId,
           clientName: "Cliente balcão",
           clientPhone: "",
-          date: new Date().toISOString(),
+          date: startDate.toISOString(),
+          endDate: endDate.toISOString(),
           status: "COMPLETED",
           paymentMethod: quickPaymentMethod,
+          finalPrice: Number(service?.price ?? 0),
+          paidAt: new Date().toISOString(),
         }),
       });
 
@@ -793,6 +882,10 @@ export default function BookingDrawer({
 
   return (
     <>
+      <button type="button" onClick={openQuickCashier} className="sr-only">
+        Abrir caixa rápido
+      </button>
+
       <div className="xl:hidden">
         <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
           <SheetContent
@@ -879,7 +972,9 @@ export default function BookingDrawer({
                       {service.durationInMinutes
                         ? ` • ${service.durationInMinutes} min`
                         : ""}
-                      {service.id === mostUsedServiceId ? " ⭐ Mais agendado" : ""}
+                      {service.id === mostUsedServiceId
+                        ? " ⭐ Mais agendado"
+                        : ""}
                     </option>
                   ))}
                 </select>
@@ -894,21 +989,9 @@ export default function BookingDrawer({
               <Field label="Forma de pagamento" icon={<CreditCard size={16} />}>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    {
-                      value: "CARD",
-                      label: "Cartão",
-                      icon: <CreditCard size={15} />,
-                    },
-                    {
-                      value: "CASH",
-                      label: "Dinheiro",
-                      icon: <Banknote size={15} />,
-                    },
-                    {
-                      value: "PIX",
-                      label: "Pix",
-                      icon: <Wallet size={15} />,
-                    },
+                    { value: "CARD", label: "Cartão", icon: <CreditCard size={15} /> },
+                    { value: "CASH", label: "Dinheiro", icon: <Banknote size={15} /> },
+                    { value: "PIX", label: "Pix", icon: <Wallet size={15} /> },
                   ].map((item) => (
                     <button
                       key={item.value}
@@ -917,11 +1000,10 @@ export default function BookingDrawer({
                       onClick={() =>
                         setQuickPaymentMethod(item.value as PaymentMethod)
                       }
-                      className={`flex items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                        quickPaymentMethod === item.value
+                      className={`flex items-center justify-center gap-2 rounded-2xl border px-3 py-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${quickPaymentMethod === item.value
                           ? "border-[hsl(43_96%_56%_/_0.55)] bg-[hsl(43_96%_56%_/_0.16)] text-[hsl(43_96%_56%)]"
                           : "border-white/10 bg-zinc-950 text-zinc-300 hover:bg-white/5"
-                      }`}
+                        }`}
                     >
                       {item.icon}
                       {item.label}

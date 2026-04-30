@@ -35,14 +35,12 @@ function formatDayLabel(date: Date) {
 }
 
 function formatDayKey(date: Date) {
-  const formatter = new Intl.DateTimeFormat("sv-SE", {
+  return new Intl.DateTimeFormat("sv-SE", {
     timeZone: "America/Sao_Paulo",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  });
-
-  return formatter.format(date);
+  }).format(date);
 }
 
 function buildDateRange(startDate: Date, endDate: Date) {
@@ -64,6 +62,15 @@ function getGrowthPercent(currentValue: number, previousValue: number) {
   return ((currentValue - previousValue) / previousValue) * 100;
 }
 
+function getBookingRevenue(booking: {
+  finalPrice: unknown;
+  service: {
+    price: unknown;
+  };
+}) {
+  return Number(booking.finalPrice ?? booking.service?.price ?? 0);
+}
+
 function buildClientKey(booking: {
   userId: string | null;
   clientPhone: string | null;
@@ -80,7 +87,6 @@ function aggregateMetrics(
     clientName: string | null;
     clientPhone: string | null;
     finalPrice: unknown;
-
     service: {
       name: string;
       price: unknown;
@@ -107,7 +113,7 @@ function aggregateMetrics(
   );
 
   const totalRevenue = completedBookings.reduce((total, booking) => {
-    return total + Number(booking.finalPrice ?? booking.service.price ?? 0);
+    return total + getBookingRevenue(booking);
   }, 0);
 
   const averageTicket =
@@ -142,14 +148,15 @@ function aggregateMetrics(
 
   completedBookings.forEach((booking) => {
     const serviceName = booking.service.name;
+
     topServiceMap.set(serviceName, (topServiceMap.get(serviceName) ?? 0) + 1);
   });
 
   let topService = "-";
   let topServiceBookings = 0;
 
-for (const [serviceName, count] of Array.from(topServiceMap.entries())) {
-      if (count > topServiceBookings) {
+  for (const [serviceName, count] of Array.from(topServiceMap.entries())) {
+    if (count > topServiceBookings) {
       topService = serviceName;
       topServiceBookings = count;
     }
@@ -159,6 +166,7 @@ for (const [serviceName, count] of Array.from(topServiceMap.entries())) {
 
   completedBookings.forEach((booking) => {
     const serviceName = booking.service.name;
+
     serviceBreakdownMap.set(
       serviceName,
       (serviceBreakdownMap.get(serviceName) ?? 0) + 1
@@ -175,9 +183,10 @@ for (const [serviceName, count] of Array.from(topServiceMap.entries())) {
 
   completedBookings.forEach((booking) => {
     const barberName = booking.barber?.name ?? "Barbeiro";
+
     barberRevenueMap.set(
       barberName,
-      (barberRevenueMap.get(barberName) ?? 0) + Number(booking.service.price ?? 0)
+      (barberRevenueMap.get(barberName) ?? 0) + getBookingRevenue(booking)
     );
   });
 
@@ -194,18 +203,20 @@ for (const [serviceName, count] of Array.from(topServiceMap.entries())) {
 
   dateRange.forEach((date) => {
     const key = formatDayKey(date);
+
     bookingsByDayMap.set(key, 0);
     revenueByDayMap.set(key, 0);
   });
 
   bookings.forEach((booking) => {
     const key = formatDayKey(booking.date);
+
     bookingsByDayMap.set(key, (bookingsByDayMap.get(key) ?? 0) + 1);
 
     if (booking.status === BookingStatus.COMPLETED) {
       revenueByDayMap.set(
         key,
-        (revenueByDayMap.get(key) ?? 0) + Number(booking.service.price ?? 0)
+        (revenueByDayMap.get(key) ?? 0) + getBookingRevenue(booking)
       );
     }
   });
@@ -298,6 +309,7 @@ export async function getMetrics({
         date: "asc",
       },
     }),
+
     db.booking.findMany({
       where: {
         ...whereBase,
@@ -314,6 +326,7 @@ export async function getMetrics({
   ]);
 
   const current = aggregateMetrics(currentBookings, startDate, endDate);
+
   const previous = aggregateMetrics(
     previousBookings,
     previousStartDate,
@@ -325,6 +338,7 @@ export async function getMetrics({
       barberId: barberId ?? null,
       mode: barberId ? "barber" : "general",
     },
+
     summary: {
       ...current.summary,
       growth: {
@@ -342,11 +356,13 @@ export async function getMetrics({
         ),
       },
     },
+
     previous: {
       totalBookings: previous.summary.totalBookings,
       totalRevenue: previous.summary.totalRevenue,
       uniqueClients: previous.summary.uniqueClients,
     },
+
     charts: current.charts,
   };
 }
