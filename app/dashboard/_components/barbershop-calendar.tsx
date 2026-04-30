@@ -60,19 +60,19 @@ type ScheduleBlock = {
 
 type CalendarEvent =
   | {
-      id: string;
-      type: "booking";
-      data: Booking;
-      start: Date;
-      end: Date;
-    }
+    id: string;
+    type: "booking";
+    data: Booking;
+    start: Date;
+    end: Date;
+  }
   | {
-      id: string;
-      type: "block";
-      data: ScheduleBlock;
-      start: Date;
-      end: Date;
-    };
+    id: string;
+    type: "block";
+    data: ScheduleBlock;
+    start: Date;
+    end: Date;
+  };
 
 type EventWithLayout = CalendarEvent & {
   lane: number;
@@ -356,6 +356,105 @@ function buildTimeSlots(currentDate: Date) {
   return slots;
 }
 
+function getServiceDurationInMinutes(service?: { durationInMinutes?: number | null }) {
+  const duration = Number(service?.durationInMinutes ?? 60);
+
+  if (!Number.isFinite(duration) || duration <= 0) {
+    return 60;
+  }
+
+  return Math.max(5, Math.round(duration));
+}
+
+function buildLocalDateString(date: Date) {
+  return formatBookingInAppTimeZone(date, "yyyy-MM-dd", APP_TIME_ZONE);
+}
+
+function buildLocalTimeString(date: Date) {
+  return formatBookingInAppTimeZone(date, "HH:mm", APP_TIME_ZONE);
+}
+
+function getAvailableHours(params: {
+  selectedDate: string;
+  selectedBarberId: string;
+  serviceId: string;
+  services: Props["services"];
+  bookings: Booking[];
+  scheduleBlocks: ScheduleBlock[];
+}) {
+  if (!params.selectedDate || !params.selectedBarberId || !params.serviceId) {
+    return [];
+  }
+
+  const selectedService = params.services.find(
+    (service) => service.id === params.serviceId
+  );
+
+  if (!selectedService) {
+    return [];
+  }
+
+  const durationInMinutes = getServiceDurationInMinutes(selectedService);
+  const selectedDay = parseDatetimeLocalToUtc(`${params.selectedDate}T00:00`);
+  const limits = getScheduleLimits(selectedDay);
+
+  if (limits.isSunday) {
+    return [];
+  }
+
+  const availableHours: string[] = [];
+  const startMinutes = limits.startHour * 60;
+  const lastStartMinutes = limits.lastStartHour * 60;
+  const closeMinutes = limits.closeHour * 60;
+
+  for (
+    let currentMinutes = startMinutes;
+    currentMinutes <= lastStartMinutes;
+    currentMinutes += durationInMinutes
+  ) {
+    const endMinutes = currentMinutes + durationInMinutes;
+
+    if (endMinutes > closeMinutes) {
+      continue;
+    }
+
+    const hour = Math.floor(currentMinutes / 60);
+    const minute = currentMinutes % 60;
+    const time = `${String(hour).padStart(2, "0")}:${String(minute).padStart(
+      2,
+      "0"
+    )}`;
+
+    const startDate = parseDatetimeLocalToUtc(`${params.selectedDate}T${time}`);
+    const endDate = addMinutes(startDate, durationInMinutes);
+
+    const hasBookingConflict = params.bookings.some((booking) => {
+      if (booking.barberId !== params.selectedBarberId) return false;
+      if (booking.status === "CANCELED") return false;
+
+      const bookingStart = new Date(booking.date);
+      const bookingEnd = new Date(booking.endDate);
+
+      return startDate < bookingEnd && endDate > bookingStart;
+    });
+
+    const hasBlockConflict = params.scheduleBlocks.some((block) => {
+      if (block.barberId !== params.selectedBarberId) return false;
+
+      const blockStart = new Date(block.startDate);
+      const blockEnd = new Date(block.endDate);
+
+      return startDate < blockEnd && endDate > blockStart;
+    });
+
+    if (!hasBookingConflict && !hasBlockConflict) {
+      availableHours.push(time);
+    }
+  }
+
+  return availableHours;
+}
+
 function layoutEvents(events: CalendarEvent[]): EventWithLayout[] {
   const sorted = [...events].sort((a, b) => a.start.getTime() - b.start.getTime());
   const result: EventWithLayout[] = [];
@@ -461,6 +560,8 @@ export default function BarbershopCalendar({
 
   const [selectedBarberId, setSelectedBarberId] = useState(currentBarberId);
   const [selectedDateTime, setSelectedDateTime] = useState("");
+  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedHour, setSelectedHour] = useState("");
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [serviceId, setServiceId] = useState("");
@@ -494,6 +595,44 @@ export default function BarbershopCalendar({
   );
 
   const daySchedule = useMemo(() => getScheduleLimits(currentDate), [currentDate]);
+
+  const selectedService = useMemo(() => {
+    return services.find((service) => service.id === serviceId);
+  }, [services, serviceId]);
+
+  const selectedServiceDuration = useMemo(() => {
+    return getServiceDurationInMinutes(selectedService);
+  }, [selectedService]);
+
+  const availableHours = useMemo(() => {
+    return getAvailableHours({
+      selectedDate,
+      selectedBarberId,
+      serviceId,
+      services,
+      bookings,
+      scheduleBlocks,
+    });
+  }, [
+    selectedDate,
+    selectedBarberId,
+    serviceId,
+    services,
+    bookings,
+    scheduleBlocks,
+  ]);
+
+  const previewDate = useMemo(() => {
+    if (!selectedDate || !selectedHour) return null;
+
+    return parseDatetimeLocalToUtc(`${selectedDate}T${selectedHour}`);
+  }, [selectedDate, selectedHour]);
+
+  const previewEndDate = useMemo(() => {
+    if (!previewDate) return null;
+
+    return addMinutes(previewDate, selectedServiceDuration);
+  }, [previewDate, selectedServiceDuration]);
 
   const groupedEvents = useMemo(() => {
     return (barbers ?? []).map((barber) => {
@@ -546,9 +685,19 @@ export default function BarbershopCalendar({
     setCurrentDate((prev) => addDays(prev, 1));
   }
 
-  function openCreateModal(barberId: string, date?: Date) {
+  function openCreateModal(
+    barberId: string,
+    date?: Date,
+    shouldPreselectHour = false
+  ) {
+    const selected = date ?? currentDate;
+    const nextDate = buildLocalDateString(selected);
+    const nextHour = shouldPreselectHour ? buildLocalTimeString(selected) : "";
+
     setSelectedBarberId(barberId);
-    setSelectedDateTime(date ? toDatetimeLocal(date) : "");
+    setSelectedDate(nextDate);
+    setSelectedHour(nextHour);
+    setSelectedDateTime(nextHour ? `${nextDate}T${nextHour}` : "");
     setClientName("");
     setClientPhone("");
     setServiceId("");
@@ -561,6 +710,8 @@ export default function BarbershopCalendar({
     setIsCreateModalOpen(false);
     setSelectedBarberId(currentBarberId);
     setSelectedDateTime("");
+    setSelectedDate("");
+    setSelectedHour("");
     setClientName("");
     setClientPhone("");
     setServiceId("");
@@ -607,12 +758,17 @@ export default function BarbershopCalendar({
       return;
     }
 
+    if (!selectedDate || !selectedHour) {
+      alert("Selecione a data e o horário disponível.");
+      return;
+    }
+
     try {
       setIsSavingCreate(true);
 
       const selectedService = services.find((service) => service.id === serviceId);
-      const durationInMinutes = Number(selectedService?.durationInMinutes ?? 60);
-      const utcDate = parseDatetimeLocalToUtc(selectedDateTime);
+      const durationInMinutes = getServiceDurationInMinutes(selectedService);
+      const utcDate = parseDatetimeLocalToUtc(`${selectedDate}T${selectedHour}`);
       const endDate = addMinutes(utcDate, durationInMinutes);
 
       validateBookingSchedule(utcDate, durationInMinutes);
@@ -983,7 +1139,7 @@ export default function BarbershopCalendar({
                               key={`${barber.id}-slot-${index}`}
                               type="button"
                               disabled={!isSlotAvailable}
-                              onClick={() => openCreateModal(barber.id, slotDate)}
+                              onClick={() => openCreateModal(barber.id, slotDate, true)}
                               className="absolute left-0 right-0 z-0 block border-transparent text-left transition hover:bg-white/[0.03] disabled:pointer-events-none disabled:bg-black/20 disabled:opacity-40"
                               style={{
                                 top: getTopFromDate(slotDate),
@@ -1124,26 +1280,28 @@ export default function BarbershopCalendar({
       </div>
 
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-[28px] border border-white/10 bg-zinc-950 p-6 shadow-[0_30px_80px_rgba(0,0,0,0.5)]">
-            <div className="mb-6 flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-bold text-white">Novo agendamento</h2>
-                <p className="mt-1 text-sm text-zinc-400">
-                  Segunda a sexta até 20:00. Sábado até 21:00, com término máximo às 22:00.
-                </p>
-              </div>
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 p-4 backdrop-blur-sm">
+          <div className="mx-auto my-6 flex max-h-[calc(100vh-3rem)] w-full max-w-lg flex-col overflow-hidden rounded-[28px] border border-white/10 bg-zinc-950 shadow-[0_30px_80px_rgba(0,0,0,0.5)]">
+            <div className="shrink-0 border-b border-white/10 p-6 pb-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-bold text-white">Novo agendamento</h2>
+                  <p className="mt-1 text-sm text-zinc-400">
+                    Segunda a sexta até 20:00. Sábado até 21:00, com término máximo às 22:00.
+                  </p>
+                </div>
 
-              <button
-                type="button"
-                onClick={closeCreateModal}
-                className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
-              >
-                ✕
-              </button>
+                <button
+                  type="button"
+                  onClick={closeCreateModal}
+                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
-            <form onSubmit={handleCreateBooking} className="space-y-4">
+            <form onSubmit={handleCreateBooking} className="flex-1 space-y-4 overflow-y-auto p-6">
               <div>
                 <label className="mb-2 block text-sm font-medium text-zinc-200">
                   Barbeiro
@@ -1218,7 +1376,15 @@ export default function BarbershopCalendar({
                   Serviço
                 </label>
 
-                <Select value={serviceId} onValueChange={setServiceId} required>
+                <Select
+                  value={serviceId}
+                  onValueChange={(value) => {
+                    setServiceId(value);
+                    setSelectedHour("");
+                    setSelectedDateTime("");
+                  }}
+                  required
+                >
                   <SelectTrigger className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none transition focus:border-[hsl(43_96%_56%_/_0.45)]">
                     <SelectValue placeholder="Selecione um serviço" />
                   </SelectTrigger>
@@ -1240,20 +1406,96 @@ export default function BarbershopCalendar({
                 </Select>
               </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-medium text-zinc-200">
-                  Data e hora
-                </label>
-                <input
-                  type="datetime-local"
-                  value={selectedDateTime}
-                  onChange={(e) => setSelectedDateTime(e.target.value)}
-                  className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none transition focus:border-[hsl(43_96%_56%_/_0.45)]"
-                  required
-                />
+              <div className="space-y-4 rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-zinc-200">
+                    Data
+                  </label>
+
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => {
+                      setSelectedDate(e.target.value);
+                      setSelectedHour("");
+                      setSelectedDateTime("");
+                    }}
+                    className="w-full rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 text-white outline-none transition [color-scheme:dark] focus:border-[hsl(43_96%_56%_/_0.45)]"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-3 border-t border-white/10 pt-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-white">
+                      Horários disponíveis
+                    </p>
+
+                    <p className="text-xs text-zinc-400">
+                      Duração do serviço: {selectedServiceDuration} min
+                    </p>
+                  </div>
+
+                  {!serviceId ? (
+                    <p className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-zinc-500">
+                      Selecione um serviço para calcular os horários disponíveis.
+                    </p>
+                  ) : !selectedDate ? (
+                    <p className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-zinc-500">
+                      Selecione uma data para visualizar os horários.
+                    </p>
+                  ) : availableHours.length > 0 ? (
+                    <div className="max-h-56 overflow-y-auto pr-1">
+                      <div className="flex flex-wrap gap-2">
+                        {availableHours.map((time) => (
+                          <button
+                            key={time}
+                            type="button"
+                            onClick={() => {
+                              setSelectedHour(time);
+                              setSelectedDateTime(`${selectedDate}T${time}`);
+                            }}
+                            className={`rounded-full border px-4 py-2 text-sm font-bold transition ${selectedHour === time
+                                ? "border-transparent bg-[hsl(43_96%_56%)] text-black shadow-[0_0_20px_hsl(43_96%_56%_/_0.25)]"
+                                : "border-white/10 bg-zinc-950 text-white hover:border-[hsl(43_96%_56%_/_0.45)] hover:bg-[hsl(43_96%_56%_/_0.08)]"
+                              }`}
+                          >
+                            {time}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-zinc-500">
+                      Nenhum horário disponível para este barbeiro nesta data.
+                    </p>
+                  )}
+                </div>
+
+                {previewDate && previewEndDate ? (
+                  <div className="rounded-2xl border border-[hsl(43_96%_56%_/_0.25)] bg-[hsl(43_96%_56%_/_0.08)] p-4">
+                    <p className="text-xs uppercase tracking-wide text-zinc-400">
+                      Previsão do atendimento
+                    </p>
+
+                    <p className="mt-1 font-semibold text-white">
+                      {formatBookingInAppTimeZone(
+                        previewDate,
+                        "dd/MM/yyyy 'às' HH:mm",
+                        APP_TIME_ZONE
+                      )}{" "}
+                      até{" "}
+                      {formatBookingInAppTimeZone(
+                        previewEndDate,
+                        "HH:mm",
+                        APP_TIME_ZONE
+                      )}
+                    </p>
+                  </div>
+                ) : null}
               </div>
 
-              <div className="flex justify-end gap-3 pt-2">
+              <div className="mx-6 flex justify-end gap-3 border-t border-white/10 bg-zinc-950/95 px-6 py-4 backdrop-blur">
                 <button
                   type="button"
                   onClick={closeCreateModal}
@@ -1276,8 +1518,8 @@ export default function BarbershopCalendar({
       )}
 
       {isBlockModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-[28px] border border-white/10 bg-zinc-950 p-6 shadow-[0_30px_80px_rgba(0,0,0,0.5)]">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 p-4 backdrop-blur-sm">
+          <div className="mx-auto my-6 w-full max-w-lg rounded-[28px] border border-white/10 bg-zinc-950 p-6 shadow-[0_30px_80px_rgba(0,0,0,0.5)]">
             <div className="mb-6 flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-xl font-bold text-white">Bloqueio de agenda</h2>
@@ -1351,22 +1593,24 @@ export default function BarbershopCalendar({
                 />
               </div>
 
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={closeBlockModal}
-                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-zinc-200 transition hover:bg-white/10"
-                >
-                  Cancelar
-                </button>
+              <div className="mx-6 mt-6 border-t border-white/10 bg-zinc-950/95 px-6 py-4 backdrop-blur">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={closeBlockModal}
+                    className="order-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-zinc-200 transition hover:bg-white/10 sm:order-1"
+                  >
+                    Cancelar
+                  </button>
 
-                <button
-                  type="submit"
-                  disabled={isSavingBlock}
-                  className="premium-button rounded-2xl px-4 py-3 text-sm font-semibold disabled:opacity-50"
-                >
-                  {isSavingBlock ? "Salvando..." : "Salvar bloqueio"}
-                </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingBlock}
+                    className="premium-button order-1 rounded-2xl px-4 py-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50 sm:order-2"
+                  >
+                    {isSavingBlock ? "Salvando..." : "Salvar bloqueio"}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
