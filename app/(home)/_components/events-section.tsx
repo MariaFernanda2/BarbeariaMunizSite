@@ -34,7 +34,7 @@ const mockEvents: Event[] = [
     title: "Dia dos Namorados",
     date: new Date(2026, 5, 12),
     description: "Descontos para ficar no estilo 💈❤️",
-    image:"https://meubolso.mercadopago.com.br/hs-fs/hubfs/imagens/blog/meu_bolso/Presente-para-o-Dia-dos-Namorados-Mercado-Pago.jpg?width=670&name=Presente-para-o-Dia-dos-Namorados-Mercado-Pago.jpg",
+    image:"https://admin.cnnbrasil.com.br/wp-content/uploads/sites/12/2023/06/rosa-e-presente-presente-em-fundo-de-madeira-dia-dos-namorados.jpg?w=1200&h=1200&crop=1",
     
   },
   {

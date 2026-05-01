@@ -18,10 +18,10 @@ export type BarbershopSummary = {
 export type BookingServiceSummary = {
   id: string;
   name: string;
-  barbershopId: string;
   price: number;
   description: string;
   imageUrl: string;
+  durationInMinutes?: number;
 };
 
 export type BookingBarberSummary = {
@@ -41,6 +41,7 @@ export type BookingSummary = {
   id: string;
   date: string;
   status: "CONFIRMED" | "COMPLETED" | "CANCELED";
+  finalPrice?: number | string | null;
   service: BookingServiceSummary;
   barber: BookingBarberSummary;
   barbershop: BookingBarbershopSummary;
@@ -50,11 +51,12 @@ export type BookingPreview = {
   service: {
     id: string;
     name: string;
-    barbershopId: string;
-    price: number | string;
+    price: string | number;
     description: string;
     imageUrl: string;
+    durationInMinutes?: number;
   };
+  finalPrice?: number | string | null;
   barbershop: BookingBarbershopSummary;
   date?: string | Date;
 };

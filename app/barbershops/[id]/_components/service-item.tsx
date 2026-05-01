@@ -17,7 +17,7 @@ import {
   formatBookingInAppTimeZone,
 } from "@/app/lib/utils/timezone";
 
-import { Barbershop, Service, Barber } from "@prisma/client";
+import { Barbershop, Barber } from "@prisma/client";
 import { ptBR } from "date-fns/locale";
 import { signIn, useSession } from "next-auth/react";
 import Image from "next/image";
@@ -33,10 +33,17 @@ interface BarbershopWithBarbers extends Barbershop {
 
 interface ServiceItemProps {
   barbershop: BarbershopWithBarbers;
-  service: Service & {
-    durationInMinutes?: number;
-  };
-}
+  service: ServiceWithPrice;
+};
+
+type ServiceWithPrice = {
+  id: string;
+  name: string;
+  description: string;
+  imageUrl: string;
+  durationInMinutes?: number;
+  price: number;
+};
 
 type DayBooking = {
   id: string;
@@ -399,11 +406,10 @@ const ServiceItem = ({ service, barbershop }: ServiceItemProps) => {
                       setBarberId(barber.id);
                       setHour(undefined);
                     }}
-                    className={`flex flex-col items-center rounded-xl border p-3 transition-all ${
-                      barberId === barber.id
-                        ? "border-primary bg-premium-soft premium-glow"
-                        : "border-gray-200 hover:border-primary"
-                    }`}
+                    className={`flex flex-col items-center rounded-xl border p-3 transition-all ${barberId === barber.id
+                      ? "border-primary bg-premium-soft premium-glow"
+                      : "border-gray-200 hover:border-primary"
+                      }`}
                   >
                     <div className="relative h-16 w-16 overflow-hidden rounded-full">
                       <Image
@@ -493,11 +499,10 @@ const ServiceItem = ({ service, barbershop }: ServiceItemProps) => {
                         key={time}
                         onClick={() => setHour(time)}
                         variant="outline"
-                        className={`rounded-full ${
-                          hour === time
-                            ? "premium-button border-transparent"
-                            : "border-zinc-700 bg-transparent text-white hover:border-primary hover:bg-premium-soft"
-                        }`}
+                        className={`rounded-full ${hour === time
+                          ? "premium-button border-transparent"
+                          : "border-zinc-700 bg-transparent text-white hover:border-primary hover:bg-premium-soft"
+                          }`}
                       >
                         {time}
                       </Button>
@@ -515,10 +520,9 @@ const ServiceItem = ({ service, barbershop }: ServiceItemProps) => {
               <BookingInfo
                 booking={{
                   barbershop,
-                  service: {
-                    ...service,
-                    price: Number(service.price),
-                  },
+                    service: service,
+                    finalPrice: service.price,
+                 
                   date: previewDate,
                 }}
               />

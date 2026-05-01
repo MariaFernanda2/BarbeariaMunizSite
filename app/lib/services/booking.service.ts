@@ -66,16 +66,26 @@ export class BookingService {
       throw new AppError("O barbeiro não pertence a essa unidade.", 400);
     }
 
-    const service = await db.service.findUnique({
-      where: { id: data.serviceId },
+    const barbershopService = await db.barbershopService.findUnique({
+      where: {
+        barbershopId_serviceId: {
+          barbershopId: data.barbershopId,
+          serviceId: data.serviceId,
+        },
+      },
+      include: {
+        service: true,
+      },
     });
+
+    if (!barbershopService) {
+      throw new AppError("Serviço não encontrado nessa unidade.", 404);
+    }
+
+    const service = barbershopService.service;
 
     if (!service) {
       throw new AppError("Serviço não encontrado.", 404);
-    }
-
-    if (String(service.barbershopId) !== String(data.barbershopId)) {
-      throw new AppError("O serviço não pertence a essa unidade.", 400);
     }
 
     const bookingEndDate = buildBookingEndDate(
@@ -153,7 +163,7 @@ export class BookingService {
       clientPhone: data.clientPhone ?? null,
       status: data.status ?? BookingStatus.CONFIRMED,
       paymentMethod: data.paymentMethod ?? null,
-      finalPrice: data.finalPrice ?? Number(service.price),
+      finalPrice: data.finalPrice ?? Number(barbershopService.price),
       paidAt: isCompleted ? new Date() : null,
     });
 
@@ -222,17 +232,23 @@ export class BookingService {
       nextServiceId = data.serviceId;
     }
 
-    const service = await db.service.findUnique({
-      where: { id: nextServiceId },
+    const barbershopService = await db.barbershopService.findUnique({
+      where: {
+        barbershopId_serviceId: {
+          barbershopId: existingBooking.barbershopId,
+          serviceId: nextServiceId,
+        },
+      },
+      include: {
+        service: true,
+      },
     });
 
-    if (!service) {
-      throw new AppError("Serviço não encontrado.", 404);
+    if (!barbershopService) {
+      throw new AppError("Serviço não encontrado nessa unidade.", 404);
     }
 
-    if (String(service.barbershopId) !== String(existingBooking.barbershopId)) {
-      throw new AppError("O serviço não pertence a essa unidade.", 400);
-    }
+    const service = barbershopService.service;
 
     const nextEndDate = buildBookingEndDate(
       nextDate,
@@ -305,7 +321,7 @@ export class BookingService {
       updatePayload.paidAt = existingBooking.paidAt ?? new Date();
 
       if (data.finalPrice === undefined || data.finalPrice === null) {
-        updatePayload.finalPrice = Number(service.price ?? 0);
+        updatePayload.finalPrice = Number(barbershopService.price ?? 0);
       }
     }
 

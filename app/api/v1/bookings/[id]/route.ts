@@ -32,6 +32,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     const updatedBooking = await service.updateBooking(params.id, {
       date: body.date,
+      endDate: body.endDate,
       status: body.status,
       clientName: body.clientName,
       clientPhone: body.clientPhone,
@@ -72,12 +73,22 @@ function handleError(error: unknown) {
   if (error instanceof AppError) {
     return NextResponse.json(
       { success: false, message: error.message },
-      { status: error.statusCode }
+      { status: error.statusCode },
+    );
+  }
+   if (error instanceof Error) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: error.message,
+        stack: error.stack,
+      },
+      { status: 500 }
     );
   }
 
   return NextResponse.json(
     { success: false, message: "Erro interno do servidor" },
-    { status: 500 }
+    { status: 500 },
   );
 }

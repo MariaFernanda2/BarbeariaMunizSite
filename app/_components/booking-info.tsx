@@ -10,17 +10,19 @@ interface BookingInfoProps {
 
 const BookingInfo = ({ booking }: BookingInfoProps) => {
   const bookingDate = booking.date ? new Date(booking.date) : null;
+  const bookingPrice = Number(booking.finalPrice ?? 0);
 
   return (
     <Card>
       <CardContent className="flex flex-col gap-3 p-3">
         <div className="flex justify-between">
           <h2 className="font-bold">{booking.service.name}</h2>
+
           <h3 className="text-sm font-bold">
             {Intl.NumberFormat("pt-BR", {
               style: "currency",
               currency: "BRL",
-            }).format(Number(booking.service.price))}
+            }).format(bookingPrice)}
           </h3>
         </div>
 

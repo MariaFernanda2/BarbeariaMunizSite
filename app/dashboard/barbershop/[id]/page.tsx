@@ -33,14 +33,17 @@ export default async function DashboardBarbershopPage({
     return <p className="p-6 text-white">Sem acesso a essa unidade.</p>;
   }
 
-  const shouldOpenCreateBookingSheet =
-    searchParams?.createBooking === "true";
+  const shouldOpenCreateBookingSheet = searchParams?.createBooking === "true";
 
   const barbershop = await db.barbershop.findUnique({
     where: { id: params.id },
     include: {
       barbers: true,
-      services: true,
+      services: {
+        include: {
+          service: true,
+        },
+      },
     },
   });
 
@@ -77,6 +80,31 @@ export default async function DashboardBarbershopPage({
 
   const currentBarberId = session.user.barberId ?? session.user.id;
 
+  const formattedBookings = bookings.map((booking) => {
+    const finalPrice =
+      booking.finalPrice !== null && booking.finalPrice !== undefined
+        ? Number(booking.finalPrice)
+        : null;
+
+    return {
+      ...booking,
+      finalPrice,
+      service: {
+        ...booking.service,
+        price: finalPrice ?? 0,
+      },
+    };
+  });
+
+  const formattedServices = barbershop.services.map((barbershopService) => ({
+    id: barbershopService.service.id,
+    name: barbershopService.service.name,
+    description: barbershopService.service.description,
+    imageUrl: barbershopService.service.imageUrl,
+    durationInMinutes: barbershopService.service.durationInMinutes,
+    price: Number(barbershopService.price),
+  }));
+
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <Header />
@@ -94,7 +122,6 @@ export default async function DashboardBarbershopPage({
                 {barbershop.address}
               </p>
             </div>
-
           </div>
         </div>
       </div>
@@ -102,21 +129,8 @@ export default async function DashboardBarbershopPage({
       <div className="mx-auto max-w-[1600px] px-6 py-6">
         <BarbershopCalendar
           barbers={barbershop.barbers}
-          bookings={bookings.map((booking) => ({
-            ...booking,
-            finalPrice:
-              booking.finalPrice !== null && booking.finalPrice !== undefined
-                ? Number(booking.finalPrice)
-                : null,
-            service: {
-              ...booking.service,
-              price: Number(booking.service.price),
-            },
-          }))}
-          services={barbershop.services.map((service) => ({
-            ...service,
-            price: Number(service.price),
-          }))}
+          bookings={formattedBookings}
+          services={formattedServices}
           scheduleBlocks={scheduleBlocks}
           barbershopId={barbershop.id}
           currentBarberId={currentBarberId}

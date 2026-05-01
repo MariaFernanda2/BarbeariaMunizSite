@@ -41,7 +41,7 @@ type Booking = {
   service: {
     id: string;
     name: string;
-    price: any;
+    price: number;
     durationInMinutes?: number | null;
   };
   clientName?: string | null;
@@ -85,7 +85,7 @@ interface Props {
   services: {
     id: string;
     name: string;
-    price: any;
+    price: number;
     description?: string;
     imageUrl?: string;
     durationInMinutes?: number | null;
@@ -1456,8 +1456,8 @@ export default function BarbershopCalendar({
                               setSelectedDateTime(`${selectedDate}T${time}`);
                             }}
                             className={`rounded-full border px-4 py-2 text-sm font-bold transition ${selectedHour === time
-                                ? "border-transparent bg-[hsl(43_96%_56%)] text-black shadow-[0_0_20px_hsl(43_96%_56%_/_0.25)]"
-                                : "border-white/10 bg-zinc-950 text-white hover:border-[hsl(43_96%_56%_/_0.45)] hover:bg-[hsl(43_96%_56%_/_0.08)]"
+                              ? "border-transparent bg-[hsl(43_96%_56%)] text-black shadow-[0_0_20px_hsl(43_96%_56%_/_0.25)]"
+                              : "border-white/10 bg-zinc-950 text-white hover:border-[hsl(43_96%_56%_/_0.45)] hover:bg-[hsl(43_96%_56%_/_0.08)]"
                               }`}
                           >
                             {time}

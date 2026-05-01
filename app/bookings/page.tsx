@@ -17,23 +17,32 @@ type BookingWithRelations = Prisma.BookingGetPayload<{
 }>;
 
 function normalizeBooking(booking: BookingWithRelations): BookingSummary {
+  const finalPrice =
+    booking.finalPrice !== null && booking.finalPrice !== undefined
+      ? Number(booking.finalPrice)
+      : null;
+
   return {
     id: booking.id,
     date: booking.date.toISOString(),
     status: booking.status,
+    finalPrice,
+
     service: {
       id: booking.service.id,
       name: booking.service.name,
-      barbershopId: booking.service.barbershopId,
-      price: Number(booking.service.price),
+      price: finalPrice ?? 0,
       description: booking.service.description,
       imageUrl: booking.service.imageUrl,
+      durationInMinutes: booking.service.durationInMinutes,
     },
+
     barber: {
       id: booking.barber.id,
       name: booking.barber.name,
       imageUrl: booking.barber.imageUrl,
     },
+
     barbershop: {
       id: booking.barbershop.id,
       name: booking.barbershop.name,

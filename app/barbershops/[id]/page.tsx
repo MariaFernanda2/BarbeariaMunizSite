@@ -1,7 +1,6 @@
 import { db } from "@/app/lib/repositories/prisma";
 import BarbershopInfo from "./_components/barbershop-info";
 import ServiceItem from "./_components/service-item";
-import { Service } from "@prisma/client";
 
 interface BarbershopDetailsPageProps {
   params: {
@@ -13,7 +12,7 @@ const BarbershopDetailsPage = async ({
   params,
 }: BarbershopDetailsPageProps) => {
   if (!params.id) {
-    return null; // depois você pode usar redirect()
+    return null;
   }
 
   const barbershop = await db.barbershop.findUnique({
@@ -21,7 +20,11 @@ const BarbershopDetailsPage = async ({
       id: params.id,
     },
     include: {
-      services: true,
+      services: {
+        include: {
+          service: true,
+        },
+      },
       barbers: true,
     },
   });
@@ -30,15 +33,27 @@ const BarbershopDetailsPage = async ({
     return null;
   }
 
+  const formattedBarbershop = {
+    ...barbershop,
+    services: barbershop.services.map((barbershopService) => ({
+      id: barbershopService.service.id,
+      name: barbershopService.service.name,
+      description: barbershopService.service.description,
+      imageUrl: barbershopService.service.imageUrl,
+      durationInMinutes: barbershopService.service.durationInMinutes,
+      price: Number(barbershopService.price),
+    })),
+  };
+
   return (
     <div>
-      <BarbershopInfo barbershop={barbershop} />
+      <BarbershopInfo barbershop={formattedBarbershop} />
 
-      <div className="px-5 flex flex-col gap-4 py-6">
-        {barbershop.services.map((service: Service) => (
+      <div className="flex flex-col gap-4 px-5 py-6">
+        {formattedBarbershop.services.map((service) => (
           <ServiceItem
             key={service.id}
-            barbershop={barbershop}
+            barbershop={formattedBarbershop}
             service={service}
           />
         ))}
