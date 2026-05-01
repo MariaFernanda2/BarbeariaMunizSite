@@ -42,12 +42,12 @@ export class BookingRepository {
     });
   }
 
-  async findById(id: string) {
-    return db.booking.findUnique({
-      where: { id },
-      include: bookingInclude,
-    });
-  }
+async findById(id: string) {
+  return db.booking.findUnique({
+    where: { id },
+    include: bookingInclude,
+  });
+}
 
   async findByUser(userId: string) {
     return db.booking.findMany({

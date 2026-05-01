@@ -25,25 +25,37 @@ model User {
 }
 
 model Barbershop {
-  id             String          @id @default(uuid())
+  id             String              @id @default(uuid())
   name           String
   address        String
   imageUrl       String
   barbers        Barber[]
   bookings       Booking[]
-  services       Service[]
+  services       BarbershopService[]
   scheduleBlocks ScheduleBlock[]
 }
 
+model BarbershopService {
+  id           String     @id @default(uuid())
+  barbershopId String
+  serviceId    String
+  price        Decimal    @db.Decimal(10, 2)
+  active       Boolean    @default(true)
+
+  barbershop   Barbershop @relation(fields: [barbershopId], references: [id], onDelete: Cascade)
+  service      Service    @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([barbershopId, serviceId])
+}
+
 model Service {
-  id                String     @id @default(uuid())
+  id                String              @id @default(uuid())
   name              String
-  price             Decimal    @db.Decimal(10, 2)
-  durationInMinutes Int        @default(30)
-  barbershopId      String
   description       String
   imageUrl          String
-  barbershop        Barbershop @relation(fields: [barbershopId], references: [id])
+  durationInMinutes Int                 @default(30)
+
+  barbershops       BarbershopService[]
   bookings          Booking[]
 }
 

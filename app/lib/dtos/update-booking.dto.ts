@@ -1,5 +1,6 @@
 export interface UpdateBookingDTO {
   date?: string;
+  endDate?: string;
   status?: "CONFIRMED" | "COMPLETED" | "CANCELED";
   userId?: string;
   clientName?: string;
