@@ -96,17 +96,30 @@ function hasTimeOverlap(
   return startA < endB && endA > startB;
 }
 
-function generateDayTimeList(date: Date) {
+function generateDayTimeList(date: Date, durationInMinutes: number) {
   const list: string[] = [];
-  const current = new Date(date);
 
-  current.setHours(START_HOUR, 0, 0, 0);
+  const current = buildUtcDateFromLocalSelection(
+    date,
+    `${String(START_HOUR).padStart(2, "0")}:00`,
+    APP_TIME_ZONE
+  );
 
-  const end = new Date(date);
-  end.setHours(END_HOUR, 0, 0, 0);
+  const closeDate = buildUtcDateFromLocalSelection(
+    date,
+    `${String(END_HOUR).padStart(2, "0")}:00`,
+    APP_TIME_ZONE
+  );
 
-  while (current <= end) {
-    list.push(formatBookingInAppTimeZone(current, "HH:mm", APP_TIME_ZONE));
+  while (current < closeDate) {
+    const slotEnd = new Date(
+      current.getTime() + durationInMinutes * 60 * 1000
+    );
+
+    if (slotEnd <= closeDate) {
+      list.push(formatBookingInAppTimeZone(current, "HH:mm", APP_TIME_ZONE));
+    }
+
     current.setMinutes(current.getMinutes() + SLOT_INTERVAL_MINUTES);
   }
 
@@ -245,6 +258,7 @@ const ServiceItem = ({ service, barbershop }: ServiceItemProps) => {
           barberId,
           barbershopId: barbershop.id,
           date: bookingDateUtc.toISOString(),
+          endDate: bookingEndDateUtc.toISOString(),
           clientName: clientName.trim(),
           clientPhone: clientPhone.trim(),
         }),
@@ -279,62 +293,50 @@ const ServiceItem = ({ service, barbershop }: ServiceItemProps) => {
     }
   };
 
-  const timeList = useMemo(() => {
-    if (!date || !barberId) return [];
+const timeList = useMemo(() => {
+  if (!date || !barberId) return [];
 
-    const now = new Date();
-    const selectedDayKey = getAppDayKey(date);
+  const now = new Date();
 
-    return generateDayTimeList(date).filter((time) => {
-      const slotStart = buildUtcDateFromLocalSelection(
-        date,
-        time,
-        APP_TIME_ZONE
-      );
+  return generateDayTimeList(date, durationInMinutes).filter((time) => {
+    const slotStart = buildUtcDateFromLocalSelection(
+      date,
+      time,
+      APP_TIME_ZONE
+    );
 
-      const slotEnd = new Date(
-        slotStart.getTime() + durationInMinutes * 60 * 1000
-      );
+    const slotEnd = new Date(
+      slotStart.getTime() + durationInMinutes * 60 * 1000
+    );
 
-      const hasBookingConflict = dayBookings.some((booking) => {
-        if (booking.barberId !== barberId) return false;
-        if (booking.status === "CANCELED") return false;
-        if (getAppDayKey(booking.date) !== selectedDayKey) return false;
+    if (slotStart <= now) return false;
 
-        const bookingStart = new Date(booking.date);
-        const bookingEnd = new Date(booking.endDate);
+    const hasBookingConflict = dayBookings.some((booking) => {
+      if (booking.barberId !== barberId) return false;
+      if (booking.status === "CANCELED") return false;
 
-        return hasTimeOverlap(slotStart, slotEnd, bookingStart, bookingEnd);
-      });
+      const bookingStart = new Date(booking.date);
+      const bookingEnd = new Date(booking.endDate);
 
-      if (hasBookingConflict) return false;
-
-      const hasBlockConflict = dayBlocks.some((block) => {
-        if (block.barberId !== barberId) return false;
-
-        const blockStart = new Date(block.startDate);
-        const blockEnd = new Date(block.endDate);
-
-        return hasTimeOverlap(slotStart, slotEnd, blockStart, blockEnd);
-      });
-
-      if (hasBlockConflict) return false;
-
-      const slotEndHour = Number(
-        formatBookingInAppTimeZone(slotEnd, "H", APP_TIME_ZONE)
-      );
-      const slotEndMinute = Number(
-        formatBookingInAppTimeZone(slotEnd, "m", APP_TIME_ZONE)
-      );
-
-      if (slotEndHour > END_HOUR) return false;
-      if (slotEndHour === END_HOUR && slotEndMinute > 0) return false;
-
-      if (slotStart <= now) return false;
-
-      return true;
+      return hasTimeOverlap(slotStart, slotEnd, bookingStart, bookingEnd);
     });
-  }, [date, barberId, dayBookings, dayBlocks, durationInMinutes]);
+
+    if (hasBookingConflict) return false;
+
+    const hasBlockConflict = dayBlocks.some((block) => {
+      if (block.barberId !== barberId) return false;
+
+      const blockStart = new Date(block.startDate);
+      const blockEnd = new Date(block.endDate);
+
+      return hasTimeOverlap(slotStart, slotEnd, blockStart, blockEnd);
+    });
+
+    if (hasBlockConflict) return false;
+
+    return true;
+  });
+}, [date, barberId, dayBookings, dayBlocks, durationInMinutes]);
 
   const previewDate = useMemo(() => {
     if (!date || !hour) return undefined;
