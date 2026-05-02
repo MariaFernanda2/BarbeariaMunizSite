@@ -1,10 +1,12 @@
-import { BarbershopRepository, BarbershopWithRelations } from "../repositories/barbershop.repository";
+import {
+  BarbershopRepository,
+  BarbershopWithRelations,
+} from "../repositories/barbershop.repository";
 import { BarbershopResponseDTO } from "../dtos/barbershop-response.dto";
 import { AppError } from "../errors/app-error";
 import { BarbershopDetailsResponseDTO } from "../dtos/barbershop-details-response.dto";
 
 export class BarbershopService {
-
   constructor(private repository: BarbershopRepository) {}
 
   async findAll(page: number, limit: number, search?: string) {
@@ -14,7 +16,7 @@ export class BarbershopService {
     ]);
 
     return {
-      data: barbershops.map((b) => this.mapToResponse(b)),
+      data: barbershops.map((barbershop) => this.mapToResponse(barbershop)),
       pagination: {
         page,
         limit,
@@ -24,34 +26,35 @@ export class BarbershopService {
     };
   }
 
-async findById(id: string): Promise<BarbershopDetailsResponseDTO> {
-  const barbershop = await this.repository.findById(id);
+  async findById(id: string): Promise<BarbershopDetailsResponseDTO> {
+    const barbershop = await this.repository.findById(id);
 
-  if (!barbershop) {
-    throw new AppError("Barbearia não encontrada", 404);
+    if (!barbershop) {
+      throw new AppError("Barbearia não encontrada", 404);
+    }
+
+    return {
+      id: barbershop.id,
+      name: barbershop.name,
+      address: barbershop.address,
+      imageUrl: barbershop.imageUrl,
+
+      services: barbershop.services.map((barbershopService) => ({
+        id: barbershopService.service.id,
+        name: barbershopService.service.name,
+        price: Number(barbershopService.price),
+      })),
+
+      barbers: barbershop.barbers.map((barber) => ({
+        id: barber.id,
+        name: barber.name,
+      })),
+    };
   }
-
-  return {
-    id: barbershop.id,
-    name: barbershop.name,
-    address: barbershop.address,
-    imageUrl: barbershop.imageUrl,
-    services: barbershop.services.map((service) => ({
-      id: service.id,
-      name: service.name,
-      price: Number(service.price),
-    })),
-    barbers: barbershop.barbers.map((barber) => ({
-      id: barber.id,
-      name: barber.name,
-    })),
-  };
-}
 
   private mapToResponse(
     barbershop: BarbershopWithRelations
   ): BarbershopResponseDTO {
-
     return {
       id: barbershop.id,
       name: barbershop.name,

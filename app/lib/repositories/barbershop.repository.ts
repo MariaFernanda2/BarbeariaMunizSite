@@ -3,19 +3,21 @@ import { Prisma } from "@prisma/client";
 
 export type BarbershopWithRelations = Prisma.BarbershopGetPayload<{
   include: {
-    services: true;
+    services: {
+      include: {
+        service: true;
+      };
+    };
     barbers: true;
   };
 }>;
 
 export class BarbershopRepository {
-
   async findMany(
     page: number,
     limit: number,
     search?: string
   ): Promise<BarbershopWithRelations[]> {
-
     return db.barbershop.findMany({
       where: search
         ? {
@@ -26,7 +28,11 @@ export class BarbershopRepository {
           }
         : undefined,
       include: {
-        services: true,
+        services: {
+          include: {
+            service: true,
+          },
+        },
         barbers: true,
       },
       skip: (page - 1) * limit,
@@ -50,11 +56,15 @@ export class BarbershopRepository {
     });
   }
 
-  async findById(id: string) {
+  async findById(id: string): Promise<BarbershopWithRelations | null> {
     return db.barbershop.findUnique({
       where: { id },
       include: {
-        services: true,
+        services: {
+          include: {
+            service: true,
+          },
+        },
         barbers: true,
       },
     });
